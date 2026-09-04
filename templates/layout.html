@@ -1,0 +1,31 @@
+{{define "layout"}}<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{.Baslik}} · Arşiv İndeks</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header class="ust">
+    <div class="kabuk ust-ic">
+      <a class="marka" href="/arama">Arşiv&nbsp;İndeks</a>
+      <nav>
+        <a href="/arama" {{if eq .Aktif "arama"}}class="etkin"{{end}}>Arama</a>
+        <a href="/ayarlar" {{if eq .Aktif "ayarlar"}}class="etkin"{{end}}>Ayarlar</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="kabuk">
+    {{if .Hata}}<div class="uyari hata">{{.Hata}}</div>{{end}}
+    {{if .Basari}}<div class="uyari basari">{{.Basari}}</div>{{end}}
+    {{template "content" .}}
+  </main>
+
+  <footer class="kabuk alt">
+    Arşiv İndeks — yerel arama aracı. Veriler yalnızca bu bilgisayarda tutulur.
+  </footer>
+</body>
+</html>
+{{end}}

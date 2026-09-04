@@ -1,0 +1,170 @@
+{{define "content"}}
+{{with .Veri}}
+
+{{if .IndeksBos}}
+  <div class="uyari bilgi">
+    İndeks boş. Aramaya başlamak için önce
+    <a href="/ayarlar">Ayarlar</a> sayfasından taranacak dizini seçip
+    taramayı başlatın.
+  </div>
+{{else if .TaramaYarim}}
+  <div class="uyari bilgi">
+    Önceki tarama yarım kaldı — sonuçlar eksik olabilir.
+    <a href="/ayarlar">Ayarlar</a> sayfasından yeniden tarayın.
+  </div>
+{{end}}
+
+<form class="arama-form" method="GET" action="/arama">
+  <div class="satir ana-satir">
+    <input type="search" name="q" value="{{.Istek.Metin}}" autofocus
+           placeholder="Dosya adı veya içerikte ara…" class="buyuk-giris">
+    <button type="submit" class="birincil">Ara</button>
+  </div>
+
+  <div class="satir">
+    <fieldset class="kapsam">
+      <legend>Nerede aransın</legend>
+      <label><input type="radio" name="kapsam" value="hepsi"
+        {{if eq .Istek.Kapsam "hepsi"}}checked{{end}}> Ad ve içerik</label>
+      <label><input type="radio" name="kapsam" value="ad"
+        {{if eq .Istek.Kapsam "ad"}}checked{{end}}> Sadece dosya adı</label>
+      <label><input type="radio" name="kapsam" value="icerik"
+        {{if eq .Istek.Kapsam "icerik"}}checked{{end}}> Sadece içerik</label>
+    </fieldset>
+  </div>
+
+  <details class="suzgecler" {{if not .Istek.BosMu}}open{{end}}>
+    <summary>Filtreler</summary>
+
+    <div class="suzgec-izgara">
+      <label class="alan">
+        <span>Klasör</span>
+        <input type="text" name="klasor" value="{{.Istek.Klasor}}"
+               list="klasor-listesi" placeholder="Tüm klasörler">
+        <datalist id="klasor-listesi">
+          {{range .Klasorler}}<option value="{{.}}"></option>{{end}}
+        </datalist>
+      </label>
+
+      <label class="alan">
+        <span>Başlangıç tarihi</span>
+        <input type="date" name="baslangic"
+               value="{{if not .Istek.Baslangic.IsZero}}{{tarihKisa .Istek.Baslangic}}{{end}}">
+      </label>
+
+      <label class="alan">
+        <span>Bitiş tarihi</span>
+        <input type="date" name="bitis"
+               value="{{if not .Istek.Bitis.IsZero}}{{tarihKisa .Istek.Bitis}}{{end}}">
+      </label>
+
+      <label class="alan">
+        <span>Sıralama</span>
+        <select name="sirala">
+          <option value="skor" {{if eq .Istek.Sirala "skor"}}selected{{end}}>Alaka</option>
+          <option value="tarih" {{if eq .Istek.Sirala "tarih"}}selected{{end}}>Tarih (yeni→eski)</option>
+          <option value="tarih-eski" {{if eq .Istek.Sirala "tarih-eski"}}selected{{end}}>Tarih (eski→yeni)</option>
+          <option value="ad" {{if eq .Istek.Sirala "ad"}}selected{{end}}>Dosya adı</option>
+          <option value="boyut" {{if eq .Istek.Sirala "boyut"}}selected{{end}}>Boyut (büyük→küçük)</option>
+        </select>
+      </label>
+    </div>
+
+    {{if .Uzantilar}}
+    <div class="uzanti-kutusu">
+      <span class="alan-basligi">Uzantı</span>
+      <div class="uzanti-listesi">
+        {{range .Uzantilar}}
+          <label class="uzanti-etiket">
+            <input type="checkbox" name="uzanti" value="{{.Uzanti}}"
+              {{if icerir $.Veri.Istek.Uzantilar .Uzanti}}checked{{end}}>
+            <code>{{.Uzanti}}</code> <span class="sayi">{{sayi .Sayi}}</span>
+          </label>
+        {{end}}
+      </div>
+    </div>
+    {{end}}
+  </details>
+</form>
+
+{{if .AramaYapildi}}
+  <div class="ozet-cubugu">
+    {{if .Cikti.Toplam}}
+      <strong>{{sayi .Cikti.Toplam}}</strong> sonuç
+      ({{sure .Cikti.Sure}})
+      {{if gt .Cikti.SayfaSayisi 1}}
+        — sayfa {{.Cikti.Sayfa}} / {{.Cikti.SayfaSayisi}}
+      {{end}}
+    {{else}}
+      Sonuç bulunamadı.
+    {{end}}
+  </div>
+
+  {{if .Cikti.Sonuclar}}
+  <ul class="sonuclar" data-sorgu="{{.Istek.Metin}}">
+    {{range .Cikti.Sonuclar}}
+    <li class="sonuc">
+      <div class="sonuc-bas">
+        <span class="dosya-adi">
+          {{/* Vurgu YAPISAL olarak geliyor: her Metin html/template ile
+               kaçırılır, <mark> etiketleri yazar kontrolündedir. Dosya
+               içeriğine veya adına asla template.HTML uygulanmaz. */}}
+          {{range .AdParcalari}}{{if .Vurgulu}}<mark>{{.Metin}}</mark>{{else}}{{.Metin}}{{end}}{{end}}
+        </span>
+        {{if .DurumAciklama}}
+          <span class="etiket etiket-{{.Durum}}">{{.DurumAciklama}}</span>
+        {{end}}
+      </div>
+
+      <div class="sonuc-yol">{{.Klasor}}</div>
+
+      <div class="sonuc-bilgi">
+        <span>{{insanBoyut .Boyut}}</span>
+        <span>{{tarih .Zaman}}</span>
+        <span class="eylemler">
+          <a href="/dosya/indir?yol={{.Yol}}">İndir</a>
+          <form method="POST" action="/dosya/klasorde-goster" class="satir-form">
+            <input type="hidden" name="jeton" value="{{$.Jeton}}">
+            <input type="hidden" name="yol" value="{{.Yol}}">
+            <button type="submit" class="baglanti-buton">Klasörde göster</button>
+          </form>
+        </span>
+      </div>
+
+      {{if .IcerikAranabilir}}
+        <div class="parcacik" data-yol="{{.Yol}}"></div>
+      {{end}}
+    </li>
+    {{end}}
+  </ul>
+
+  {{if gt .Cikti.SayfaSayisi 1}}
+  <nav class="sayfalama">
+    {{if gt .Cikti.Sayfa 1}}
+      <a href="{{sorguDegis .Sorgu "sayfa" (printf "%d" (eksiBir .Cikti.Sayfa))}}">‹ Önceki</a>
+    {{end}}
+    {{range sayfaAraligi .Cikti.Sayfa .Cikti.SayfaSayisi}}
+      {{if eq . $.Veri.Cikti.Sayfa}}
+        <span class="mevcut">{{.}}</span>
+      {{else}}
+        <a href="{{sorguDegis $.Veri.Sorgu "sayfa" (printf "%d" .)}}">{{.}}</a>
+      {{end}}
+    {{end}}
+    {{if lt .Cikti.Sayfa .Cikti.SayfaSayisi}}
+      <a href="{{sorguDegis .Sorgu "sayfa" (printf "%d" (artiBir .Cikti.Sayfa))}}">Sonraki ›</a>
+    {{end}}
+  </nav>
+  {{end}}
+  {{end}}
+
+{{else if not .IndeksBos}}
+  <div class="bos-durum">
+    <p><strong>{{sayi .CanliSayisi}}</strong> dosya indeksli.</p>
+    <p>Dosya adına, içeriğindeki bir kelimeye, uzantısına, tarihine veya
+       bulunduğu klasöre göre arayabilirsiniz.</p>
+  </div>
+{{end}}
+
+{{end}}
+<script src="/static/js/arama.js"></script>
+{{end}}

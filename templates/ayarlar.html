@@ -1,0 +1,184 @@
+{{define "content"}}
+{{with .Veri}}
+
+<h1>Ayarlar</h1>
+
+<section class="kart">
+  <h2>İndeks durumu</h2>
+  <dl class="istatistik">
+    <div><dt>İndeksli dosya</dt><dd>{{sayi .CanliSayisi}}</dd></div>
+    <div><dt>Sözlükteki terim</dt><dd>{{sayi .TerimSayisi}}</dd></div>
+    <div><dt>Son tarama</dt><dd>{{tarih .SonTarama}}</dd></div>
+    <div><dt>Veri dizini</dt><dd class="kucuk-yol">{{.VeriDizini}}</dd></div>
+  </dl>
+  {{if .TaramaYarim}}
+    <p class="uyari bilgi">
+      Önceki tarama yarım kaldı (iptal edilmiş veya uygulama kapanmış).
+      Sonuçların tam olması için yeniden tarayın.
+    </p>
+  {{end}}
+</section>
+
+<section class="kart">
+  <h2>Tarama</h2>
+
+  <div id="tarama-alani"
+       data-durum="{{.Durum.Durum}}"
+       data-jeton="{{$.Jeton}}">
+    <div class="ilerleme-kutusu" id="ilerleme-kutusu"
+         {{if not .Durum.Calisiyor}}hidden{{end}}>
+      <div class="ilerleme-cubugu">
+        <div class="ilerleme-dolu" id="ilerleme-dolu"
+             style="width: {{.Durum.Yuzde}}%"></div>
+      </div>
+      <p class="ilerleme-metin">
+        <strong id="ilerleme-asama">{{.Durum.Asama}}</strong>
+        <span id="ilerleme-sayilar"></span>
+      </p>
+      <p class="ilerleme-dosya" id="ilerleme-dosya"></p>
+    </div>
+
+    <p class="tarama-mesaj" id="tarama-mesaj"></p>
+
+    <div class="butonlar">
+      <button type="button" id="tarama-basla" class="birincil">
+        Taramayı başlat
+      </button>
+      <button type="button" id="tarama-tam">
+        Sıfırdan tara
+      </button>
+      <button type="button" id="tarama-iptal" class="tehlike"
+              {{if not .Durum.Calisiyor}}hidden{{end}}>
+        İptal et
+      </button>
+    </div>
+
+    <p class="ipucu">
+      Normal tarama <strong>artımlıdır</strong>: boyutu ve tarihi değişmemiş
+      dosyaların içeriği yeniden okunmaz, bu yüzden çok hızlıdır.
+      &ldquo;Sıfırdan tara&rdquo; indeksi silip her şeyi yeniden okur.
+    </p>
+
+    {{if .Ozet.Islenen}}
+    <div class="ozet-kutu" id="ozet-kutu">
+      <h3>Son tarama özeti</h3>
+      <ul>
+        <li>İşlenen dosya: <strong>{{sayi .Ozet.Islenen}}</strong></li>
+        <li>İçeriği okunan: <strong>{{sayi .Ozet.IcerikOkunan}}</strong></li>
+        <li>Yalnızca adıyla indekslenen:
+            <strong>{{sayi .Ozet.SadeceAd}}</strong>
+            <span class="ipucu-ic">(taranmış PDF, eski Office biçimi,
+            bulut dosyası, çok büyük veya desteklenmeyen tür)</span></li>
+        <li>Değişmediği için atlanan: <strong>{{sayi .Ozet.Atlanan}}</strong></li>
+        <li>Hatalı: <strong>{{sayi .Ozet.Hatali}}</strong></li>
+        <li>İndeksten düşürülen (silinmiş): <strong>{{sayi .Ozet.Silinen}}</strong></li>
+        <li>Süre: <strong>{{sayi .Ozet.SureSaniye}} saniye</strong></li>
+      </ul>
+    </div>
+    {{end}}
+  </div>
+</section>
+
+<form method="POST" action="/ayarlar" class="kart">
+  <input type="hidden" name="jeton" value="{{$.Jeton}}">
+  <h2>Taranacak dizinler</h2>
+
+  <div class="gozat" id="gozat">
+    <div class="satir">
+      <input type="text" id="gozat-yol" placeholder="C:\Arsiv"
+             class="buyuk-giris">
+      <button type="button" id="gozat-git">Git</button>
+      <button type="button" id="gozat-ust">⬆ Üst klasör</button>
+    </div>
+    <div class="gozat-suruculer" id="gozat-suruculer"></div>
+    <ul class="gozat-listesi" id="gozat-listesi"></ul>
+    <p class="gozat-hata" id="gozat-hata"></p>
+    <button type="button" id="gozat-sec" class="birincil" disabled>
+      Bu klasörü listeye ekle
+    </button>
+    <p class="ipucu">
+      Yolu doğrudan yazabilir veya yapıştırabilirsiniz; gözatma yalnızca
+      kolaylık içindir.
+    </p>
+  </div>
+
+  <label class="alan">
+    <span>Taranacak dizinler (her satıra bir tane)</span>
+    <textarea name="dizinler" id="dizinler" rows="4"
+              placeholder="C:\Arsiv">{{.DizinlerMetni}}</textarea>
+  </label>
+
+  <h2>İçerik indeksleme</h2>
+
+  <label class="onay">
+    <input type="checkbox" name="icerikCikarma" value="1"
+           {{if .Ayar.IcerikCikarma}}checked{{end}}>
+    Dosya içeriklerini indeksle
+    <span class="ipucu-ic">(kapalıysa yalnızca dosya adı, uzantı,
+    tarih ve klasör aranabilir)</span>
+  </label>
+
+  <div class="ikili-izgara">
+    <label class="alan">
+      <span>İçeriği okunacak uzantılar (her satıra bir tane)</span>
+      <textarea name="icerikUzantilari" rows="8">{{.IcerikUzantilariMetni}}</textarea>
+    </label>
+
+    <label class="alan">
+      <span>Hiç indekslenmeyecek uzantılar</span>
+      <textarea name="haricUzantilar" rows="8">{{.HaricUzantilarMetni}}</textarea>
+    </label>
+  </div>
+
+  <label class="alan">
+    <span>Atlanacak klasör adları (her satıra bir tane)</span>
+    <textarea name="haricKlasorler" rows="4">{{.HaricKlasorlerMetni}}</textarea>
+  </label>
+
+  <h2>Sınırlar</h2>
+
+  <div class="izgara-dort">
+    <label class="alan">
+      <span>Azami dosya boyutu (MB)</span>
+      <input type="number" name="maksDosyaBoyutuMB" min="1" max="2048"
+             value="{{.Ayar.MaksDosyaBoyutuMB}}">
+      <small>Bundan büyük dosyaların içeriği okunmaz.</small>
+    </label>
+
+    <label class="alan">
+      <span>Azami metin karakteri</span>
+      <input type="number" name="maksMetinKarakter" min="1000" max="50000000"
+             value="{{.Ayar.MaksMetinKarakter}}">
+      <small>Dosya başına indekslenecek metin sınırı.</small>
+    </label>
+
+    <label class="alan">
+      <span>Doküman başına terim sınırı</span>
+      <input type="number" name="dokumanBelirtecCap" min="100" max="100000"
+             value="{{.Ayar.DokumanBelirtecCap}}">
+      <small>Tek bozuk dosyanın sözlüğü şişirmesini engeller.</small>
+    </label>
+
+    <label class="alan">
+      <span>İşçi sayısı (0 = otomatik)</span>
+      <input type="number" name="isciSayisi" min="0" max="64"
+             value="{{.Ayar.IsciSayisi}}">
+      <small>Eşzamanlı içerik çıkarımı sayısı.</small>
+    </label>
+
+    <label class="alan">
+      <span>Sayfa başına sonuç</span>
+      <input type="number" name="sayfaBasiSonuc" min="5" max="200"
+             value="{{.Ayar.SayfaBasiSonuc}}">
+    </label>
+  </div>
+
+  <div class="butonlar">
+    <button type="submit" class="birincil">Ayarları kaydet</button>
+  </div>
+</form>
+
+{{end}}
+<script src="/static/js/gozat.js"></script>
+<script src="/static/js/tarama.js"></script>
+{{end}}
