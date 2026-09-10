@@ -14,6 +14,7 @@ import (
 	"flag"
 	"fmt"
 	"html/template"
+	"io"
 	"io/fs"
 	"log"
 	"net/http"
@@ -93,6 +94,7 @@ func main() {
 	if err := os.MkdirAll(veriDizini, 0o755); err != nil {
 		log.Fatalf("veri dizini oluşturulamadı: %v", err)
 	}
+	gunlukAyarla(veriDizini)
 
 	u, err := yeniUygulama(veriDizini, *gelistirme)
 	if err != nil {
@@ -117,6 +119,35 @@ func main() {
 	if err := sunucu.ListenAndServe(); err != nil {
 		log.Fatal(err)
 	}
+}
+
+// gunlukAyarla loglari <veriDizini>/arsiv-indeks.log dosyasina yonlendirir.
+//
+// -H=windowsgui ile derlenen bir binary'de konsol yoktur; os.Stderr yazma
+// hatasi doner. sessizYazici bu hatayi yutar ki dosyaya yazma, stderr'e
+// yazmanin basarisiz olmasindan etkilenmesin (io.MultiWriter ilk hatada
+// sonraki yazicilara hic ugramaz). Elle terminalden calistirildiginda cikti
+// yine ekrana da duser.
+func gunlukAyarla(veriDizini string) {
+	yol := filepath.Join(veriDizini, "arsiv-indeks.log")
+	if bilgi, err := os.Stat(yol); err == nil && bilgi.Size() > 2*1024*1024 {
+		eski := filepath.Join(veriDizini, "arsiv-indeks.log.eski")
+		os.Remove(eski)
+		os.Rename(yol, eski)
+	}
+	dosya, err := os.OpenFile(yol, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	if err != nil {
+		return
+	}
+	log.SetOutput(io.MultiWriter(sessizYazici{os.Stderr}, dosya))
+}
+
+// sessizYazici bir yazicinin hatalarini yutar.
+type sessizYazici struct{ w io.Writer }
+
+func (s sessizYazici) Write(p []byte) (int, error) {
+	s.w.Write(p)
+	return len(p), nil
 }
 
 func yeniUygulama(veriDizini string, gelistirme bool) (*Uygulama, error) {

@@ -310,7 +310,69 @@ Notlar:
 
 ---
 
-## 11. Kapsam dışı
+## 11. Otomatik başlatma (Windows)
+
+Oturum açıldığında kendiliğinden başlayıp arka planda (konsolsuz) çalışmasını
+istiyorsanız:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\kur.ps1
+```
+
+Bu script:
+
+1. Çalışan `arsiv-indeks.exe`'yi durdurur ve eski görevi kaldırır.
+2. `-ldflags "-H=windowsgui"` ile **konsolsuz** bir kopya derler — normal
+   `go build` çıktısından farklıdır, çift tıklayınca ya da görevle
+   başlatıldığında pencere hiç açılmaz.
+3. Bu kopyayı `%LOCALAPPDATA%\Programs\ArsivIndeks\` altına kurar (depodaki
+   `.exe`'ye dokunmaz; `go build` çalışan bir binary'yi kilitleyeceği için
+   geliştirme kopyasıyla kurulum kopyası bilerek ayrılmıştır).
+4. `ArsivIndeks` adında bir Görev Zamanlayıcı görevi kaydeder: oturum
+   açılışında başlar, çökerse 1 dakika arayla 3 kez kendini yeniden başlatır,
+   3 günlük varsayılan çalışma süresi sınırı kaldırılmıştır.
+5. Başlat menüsüne `http://127.0.0.1:8080` açan bir kısayol bırakır —
+   konsol görünmediği için erişimin tek "kapısı" bu.
+
+Kaldırmak için:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\kaldir.ps1
+```
+
+Görevi, kurulum kopyasını ve kısayolu siler; **veri dizinine
+(`%APPDATA%\ArsivIndeks` — ayarlar, indeks, log) dokunmaz**.
+
+### Konsolsuz çalışırken günlük (log)
+
+`-H=windowsgui` derlemesinde konsol yok, yani her zamanki `log.Printf`
+çıktısı hiçbir yere gitmez. Bunun yerine loglar her zaman
+`%APPDATA%\ArsivIndeks\arsiv-indeks.log` dosyasına da yazılır (2 MB'ı
+geçince `arsiv-indeks.log.eski`'ye devrederek). "Çalışıyor mu?" sorusunun
+cevabı burada:
+
+```powershell
+Get-Process arsiv-indeks
+Get-Content "$env:APPDATA\ArsivIndeks\arsiv-indeks.log" -Tail 20
+```
+
+### Neden Windows Service değil
+
+Sunucu yalnızca `127.0.0.1`'de dinliyor ve veri dizini kullanıcıya özel
+(`%APPDATA%`). SYSTEM hesabıyla koşan bir Windows Service bu dizini System
+profiline çözer — ayarlar ve indeks yanlış yere yazılırdı. Görev
+Zamanlayıcı + oturum tetikleyicisi, kullanıcı bağlamında koşarak bunu
+bedavaya çözer; ayrıca NSSM/WinSW gibi üçüncü parti bir bağımlılık
+gerektirmez.
+
+### Portu veya kurulumu değiştirmek
+
+`scripts\kur.ps1` başındaki `$Adres` değişkenini değiştirip scripti tekrar
+çalıştırmak yeterli — mevcut görevi ve kopyayı üzerine yazar.
+
+---
+
+## 12. Kapsam dışı
 
 OCR (taranmış PDF içeriği) · eski OLE2 Office içerikleri · Türkçe gövdeleme
 (stemming) · gerçek zamanlı dosya izleme · konum indeksi ve terim frekansı
