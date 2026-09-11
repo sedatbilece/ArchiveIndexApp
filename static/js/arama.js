@@ -51,6 +51,63 @@
     });
   });
 
+  // ------------------------------------------------ uzantı süzgeci
+  //
+  // Uzantı sayısı arttıkça pill listesinde aranan uzantıyı bulmak
+  // zorlaşıyor; burada yazdıkça eşleşmeyenleri gizliyoruz. Zaten işaretli
+  // (checked) kutular filtre yazılsa bile açık kalır, aksi halde bir
+  // uzantı seçip sonra süzgece yazan kullanıcı seçimini görünmez halde
+  // kaybettiğini sanır.
+  var uzantiSuzgec = document.querySelector(".uzanti-suzgec");
+  var uzantiEtiketleri = Array.prototype.slice.call(
+    document.querySelectorAll(".uzanti-etiket"));
+
+  if (uzantiSuzgec && uzantiEtiketleri.length) {
+    uzantiSuzgec.addEventListener("input", function () {
+      var terim = uzantiSuzgec.value.trim().toLowerCase();
+      uzantiEtiketleri.forEach(function (etiket) {
+        var uzanti = (etiket.dataset.uzanti || "").toLowerCase();
+        var kutu = etiket.querySelector("input[type=checkbox]");
+        var goster = !terim || uzanti.indexOf(terim) !== -1 ||
+          (kutu && kutu.checked);
+        etiket.style.display = goster ? "" : "none";
+      });
+    });
+  }
+
+  // ------------------------------------------------ filtreleri sıfırla
+  //
+  // Sadece "Filtreler" içindeki alanları temizler (klasör, tarihler,
+  // sıralama, uzantı); arama metni ve "Nerede aransın" kapsamı kasıtlı
+  // olarak dokunulmadan kalır. Ardından formu gönderip sonuçları da
+  // filtresiz olarak yeniden getirir.
+  var sifirlaButonu = document.getElementById("filtreleriSifirla");
+  if (sifirlaButonu) {
+    sifirlaButonu.addEventListener("click", function () {
+      var form = sifirlaButonu.closest("form");
+      if (!form) return;
+
+      ["klasor", "baslangic", "bitis"].forEach(function (ad) {
+        var giris = form.querySelector("input[name=" + ad + "]");
+        if (giris) giris.value = "";
+      });
+
+      var sirala = form.querySelector("select[name=sirala]");
+      if (sirala) sirala.value = "skor";
+
+      form.querySelectorAll("input[name=uzanti]").forEach(function (kutu) {
+        kutu.checked = false;
+      });
+
+      if (uzantiSuzgec) {
+        uzantiSuzgec.value = "";
+        uzantiSuzgec.dispatchEvent(new Event("input"));
+      }
+
+      form.submit();
+    });
+  }
+
   // ------------------------------------------------ içerik parçacıkları
   //
   // Neden ayrı istek: 300 sayfalık bir PDF'ten metin çıkarmak 1-5 saniye

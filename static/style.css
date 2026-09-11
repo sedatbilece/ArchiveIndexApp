@@ -72,6 +72,10 @@ body {
   font-weight: 600;
 }
 
+.ust-sag { display: flex; align-items: center; gap: 18px; }
+
+.surum { color: var(--soluk); opacity: 0.6; font-size: 12px; }
+
 main { padding: 24px 20px 40px; }
 
 .alt {
@@ -161,6 +165,8 @@ button.birincil {
 
 button.birincil:hover:not(:disabled) { background: var(--aksan-koyu); border-color: var(--aksan-koyu); }
 
+.sifirla-buton { display: inline-flex; align-items: center; gap: 6px; color: var(--soluk); }
+
 button.tehlike { color: var(--hata); border-color: #e8b4b0; }
 button.tehlike:hover:not(:disabled) { background: var(--hata-zemin); }
 
@@ -232,6 +238,15 @@ fieldset.kapsam label { font-size: 14px; cursor: pointer; }
 }
 
 .uzanti-kutusu { margin-bottom: 8px; }
+.uzanti-suzgec {
+  display: block;
+  margin: 6px 0 8px;
+  padding: 4px 8px;
+  font-size: 13px;
+  border: 1px solid var(--cizgi);
+  border-radius: 6px;
+  max-width: 220px;
+}
 .uzanti-listesi { display: flex; flex-wrap: wrap; gap: 8px; }
 .uzanti-etiket {
   display: inline-flex;

@@ -10,10 +10,13 @@
   <header class="ust">
     <div class="kabuk ust-ic">
       <a class="marka" href="/arama">Arşiv&nbsp;İndeks</a>
-      <nav>
-        <a href="/arama" {{if eq .Aktif "arama"}}class="etkin"{{end}}>Arama</a>
-        <a href="/ayarlar" {{if eq .Aktif "ayarlar"}}class="etkin"{{end}}>Ayarlar</a>
-      </nav>
+      <div class="ust-sag">
+        <nav>
+          <a href="/arama" {{if eq .Aktif "arama"}}class="etkin"{{end}}>Arama</a>
+          <a href="/ayarlar" {{if eq .Aktif "ayarlar"}}class="etkin"{{end}}>Ayarlar</a>
+        </nav>
+        {{if .Versiyon}}<span class="surum">{{.Versiyon}}</span>{{end}}
+      </div>
     </div>
   </header>
 

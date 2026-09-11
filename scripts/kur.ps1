@@ -18,15 +18,21 @@ $ExeAdi = 'arsiv-indeks.exe'
 $KurulumExe = Join-Path $KurulumDizini $ExeAdi
 $DepoKoku = Split-Path -Parent $PSScriptRoot
 
-Write-Host "1/5 Calisan surec durduruluyor (varsa)..."
+Write-Host "1/6 Calisan surec durduruluyor (varsa)..."
 Get-Process -Name 'arsiv-indeks' -ErrorAction SilentlyContinue | Stop-Process -Force
 try { Unregister-ScheduledTask -TaskName $GorevAdi -Confirm:$false -ErrorAction Stop } catch {}
 Start-Sleep -Milliseconds 500
 
-Write-Host "2/5 Kurulum dizini hazirlaniyor: $KurulumDizini"
+Write-Host "2/6 Kurulum dizini hazirlaniyor: $KurulumDizini"
 New-Item -ItemType Directory -Force -Path $KurulumDizini | Out-Null
 
-Write-Host "3/5 Derleniyor (-H=windowsgui, konsolsuz)..."
+Write-Host "3/6 Versiyon guncelleniyor..."
+# version.txt derlemeden ONCE guncellenir ki go:embed az sonraki derlemeye
+# guncel surumu gomsun; aksi halde calisan binary bir onceki kurulumun
+# surum numarasini gosterir.
+$yeniVersiyon = & (Join-Path $PSScriptRoot 'versiyon-guncelle.ps1')
+
+Write-Host "4/6 Derleniyor (-H=windowsgui, konsolsuz)..."
 # Depodaki (git'e islenmis) arsiv-indeks.exe'ye hic dokunulmaz; cikti
 # dogrudan kurulum dizinine yazilir.
 Push-Location $DepoKoku
@@ -37,7 +43,7 @@ try {
     Pop-Location
 }
 
-Write-Host "4/5 Gorev Zamanlayici gorevi kaydediliyor: $GorevAdi"
+Write-Host "5/6 Gorev Zamanlayici gorevi kaydediliyor: $GorevAdi"
 $eylem = New-ScheduledTaskAction -Execute $KurulumExe -Argument "-adres $Adres" -WorkingDirectory $KurulumDizini
 $tetikleyici = New-ScheduledTaskTrigger -AtLogOn -User "$env:USERDOMAIN\$env:USERNAME"
 $asil = New-ScheduledTaskPrincipal -UserId "$env:USERDOMAIN\$env:USERNAME" -LogonType Interactive -RunLevel Limited
@@ -58,7 +64,7 @@ try {
     exit 1
 }
 
-Write-Host "5/5 Baslat menusune kisayol birakiliyor..."
+Write-Host "6/6 Baslat menusune kisayol birakiliyor..."
 $baslatMenu = [Environment]::GetFolderPath('StartMenu')
 $kisayolYolu = Join-Path $baslatMenu 'Arsiv Indeks.url'
 @"
@@ -71,8 +77,10 @@ Start-ScheduledTask -TaskName $GorevAdi
 Start-Sleep -Seconds 2
 
 $durum = Get-ScheduledTask -TaskName $GorevAdi | Select-Object -ExpandProperty State
+
 Write-Host ""
 Write-Host "Kuruldu. Gorev durumu: $durum"
+Write-Host "Surum:      $yeniVersiyon"
 Write-Host "Adres:      http://$Adres"
 Write-Host "Kurulum:    $KurulumExe"
 Write-Host "Veri/Log:   $env:APPDATA\ArsivIndeks"

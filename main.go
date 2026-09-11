@@ -41,14 +41,18 @@ import (
 //go:embed templates static
 var gomulu embed.FS
 
+//go:embed version.txt
+var versiyonGomulu string
+
 // SayfaVerisi tüm sayfaların paylaştığı görünüm modelidir.
 type SayfaVerisi struct {
-	Aktif  string // gezinti vurgusu için
-	Baslik string
-	Hata   string
-	Basari string
-	Jeton  string
-	Veri   any // sayfaya özel veri
+	Aktif    string // gezinti vurgusu için
+	Baslik   string
+	Hata     string
+	Basari   string
+	Jeton    string
+	Versiyon string
+	Veri     any // sayfaya özel veri
 }
 
 // Uygulama sunucu durumunu tutar.
@@ -220,6 +224,17 @@ func (u *Uygulama) sablonlariYukle() error {
 	return nil
 }
 
+// surum başlıkta gösterilen sürüm damgasını döner; -gelistirme modunda
+// version.txt'yi diskten okur ki kur.ps1 çalıştırmadan da güncel görünsün.
+func (u *Uygulama) surum() string {
+	if u.gelistirme {
+		if b, err := os.ReadFile("version.txt"); err == nil {
+			return strings.TrimSpace(string(b))
+		}
+	}
+	return strings.TrimSpace(versiyonGomulu)
+}
+
 func (u *Uygulama) statikHazirla() {
 	if u.gelistirme {
 		u.statik = http.StripPrefix("/static/", http.FileServer(http.Dir("static")))
@@ -248,6 +263,7 @@ func (u *Uygulama) goster(w http.ResponseWriter, sayfa string, sv SayfaVerisi) {
 	}
 	sv.Aktif = sayfa
 	sv.Jeton = u.jeton
+	sv.Versiyon = u.surum()
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := t.ExecuteTemplate(w, "layout", sv); err != nil {
 		// Gövdenin bir kısmı yazılmış olabilir; en azından kaydet.
