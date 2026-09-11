@@ -77,34 +77,13 @@
 
   // ------------------------------------------------ filtreleri sıfırla
   //
-  // Sadece "Filtreler" içindeki alanları temizler (klasör, tarihler,
-  // sıralama, uzantı); arama metni ve "Nerede aransın" kapsamı kasıtlı
-  // olarak dokunulmadan kalır. Ardından formu gönderip sonuçları da
-  // filtresiz olarak yeniden getirir.
+  // Alanları tek tek temizleyip formu göndermek yerine dosdoğru parametresiz
+  // /arama'ya yönlendiriyoruz: hem daha basit hem de URL'de boş değerli
+  // (ör. klasor=) parametre kalma ihtimalini yapısal olarak ortadan kaldırıyor.
   var sifirlaButonu = document.getElementById("filtreleriSifirla");
   if (sifirlaButonu) {
     sifirlaButonu.addEventListener("click", function () {
-      var form = sifirlaButonu.closest("form");
-      if (!form) return;
-
-      ["klasor", "baslangic", "bitis"].forEach(function (ad) {
-        var giris = form.querySelector("input[name=" + ad + "]");
-        if (giris) giris.value = "";
-      });
-
-      var sirala = form.querySelector("select[name=sirala]");
-      if (sirala) sirala.value = "skor";
-
-      form.querySelectorAll("input[name=uzanti]").forEach(function (kutu) {
-        kutu.checked = false;
-      });
-
-      if (uzantiSuzgec) {
-        uzantiSuzgec.value = "";
-        uzantiSuzgec.dispatchEvent(new Event("input"));
-      }
-
-      form.submit();
+      location.href = "/arama";
     });
   }
 

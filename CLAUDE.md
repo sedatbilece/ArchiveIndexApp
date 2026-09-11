@@ -29,6 +29,12 @@ bugüne çeker. Bu script iki durumda çalıştırılır:
    adımından ÖNCE yapılır (`go:embed` version.txt'yi derleme anında binary'ye
    gömdüğü için — aksi halde header'da bir önceki kurulumun sürümü görünür).
 
+## Commit
+
+Bu depoda asla kendi başına `git commit` çalıştırma. Kullanıcı "commit mesajı"
+dediğinde tek satırlık bir commit mesajı üret ve sadece sohbette göster —
+commit'i sen atma, kullanıcı isterse kendisi kullanır.
+
 ## Yorum satırları
 
 - Basit bir fonksiyon veya küçük bir değişiklik için yorum: **en fazla 1 satır**,
