@@ -75,6 +75,78 @@
     });
   }
 
+  // ------------------------------------------------ "/" ile odak, Esc ile temizle
+  var aramaKutusu = document.querySelector(".arama-form input[name=q]");
+  if (aramaKutusu) {
+    document.addEventListener("keydown", function (olay) {
+      if (olay.key !== "/" || olay.ctrlKey || olay.altKey || olay.metaKey) return;
+      var hedef = olay.target;
+      // Başka bir alana "/" yazan kullanıcının (ör. klasör yolu) tuşunu çalma.
+      if (hedef.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(hedef.tagName)) return;
+      olay.preventDefault();
+      aramaKutusu.focus();
+      aramaKutusu.select();
+    });
+
+    aramaKutusu.addEventListener("keydown", function (olay) {
+      if (olay.key !== "Escape") return;
+      olay.preventDefault();
+      if (aramaKutusu.value) {
+        aramaKutusu.value = "";
+      } else {
+        aramaKutusu.blur();
+      }
+    });
+  }
+
+  // ------------------------------------------------ yolu kopyala
+  //
+  // navigator.clipboard yalnızca güvenli bağlamda var (127.0.0.1 sayılır);
+  // başka bir adresten açılırsa eski execCommand yoluna düşüyoruz.
+  function panoyaYaz(metin) {
+    if (navigator.clipboard && window.isSecureContext) {
+      return navigator.clipboard.writeText(metin);
+    }
+    return new Promise(function (coz, reddet) {
+      var alan = document.createElement("textarea");
+      alan.value = metin;
+      alan.setAttribute("readonly", "");
+      alan.style.position = "fixed";
+      alan.style.opacity = "0";
+      document.body.appendChild(alan);
+      alan.select();
+      var tamam = false;
+      try { tamam = document.execCommand("copy"); } catch (e) { tamam = false; }
+      document.body.removeChild(alan);
+      if (tamam) { coz(); } else { reddet(); }
+    });
+  }
+
+  document.querySelectorAll(".kopyala-buton").forEach(function (buton) {
+    buton.hidden = false;
+    var eskiMetin = buton.textContent;
+    var zamanlayici = null;
+    buton.addEventListener("click", function (olay) {
+      var yalnizAd = olay.shiftKey;
+      var metin = yalnizAd ? buton.dataset.ad : buton.dataset.yol;
+      panoyaYaz(metin)
+        .then(function () {
+          buton.textContent = yalnizAd ? "Ad kopyalandı ✓" : "Kopyalandı ✓";
+          buton.classList.remove("hata-metni");
+        }, function () {
+          buton.textContent = "Kopyalanamadı";
+          buton.classList.add("hata-metni");
+        })
+        .then(function () {
+          clearTimeout(zamanlayici);
+          zamanlayici = setTimeout(function () {
+            buton.textContent = eskiMetin;
+            buton.classList.remove("hata-metni");
+          }, 1600);
+        });
+    });
+  });
+
   // ------------------------------------------------ filtreleri sıfırla
   //
   // Alanları tek tek temizleyip formu göndermek yerine dosdoğru parametresiz

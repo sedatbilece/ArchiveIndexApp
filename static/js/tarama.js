@@ -27,9 +27,18 @@
     mesaj.className = "tarama-mesaj" + (tur ? " " + tur : "");
   }
 
+  var favicon = document.getElementById("favicon");
+  var faviconNormal = favicon ? favicon.getAttribute("href") : "";
+  function faviconAyarla(calisiyor) {
+    if (!favicon) return;
+    var hedef = calisiyor ? faviconNormal.replace("favicon.svg", "favicon-tarama.svg") : faviconNormal;
+    if (favicon.getAttribute("href") !== hedef) favicon.setAttribute("href", hedef);
+  }
+
   // durumBas ekranı günceller ve taramanın bitip bitmediğini döner.
   function durumBas(d) {
     var calisiyor = d.calisiyor;
+    faviconAyarla(calisiyor);
 
     kutu.hidden = !calisiyor;
     iptal.hidden = !calisiyor;

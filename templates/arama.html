@@ -20,14 +20,14 @@
            placeholder="Dosya adı veya içerikte ara…" class="buyuk-giris">
     <button type="submit" class="birincil">Ara</button>
     <button type="button" class="sifirla-buton" id="filtreleriSifirla"
-            title="Filtreleri sıfırla">
+            title="Filtreleri sıfırla" aria-label="Filtreleri sıfırla">
       <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24"
            fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
            stroke-linejoin="round" aria-hidden="true">
         <path d="M3 12a9 9 0 1 0 3-6.7"/>
         <path d="M3 4v5h5"/>
       </svg>
-      Filtreleri sıfırla
+      <span class="sifirla-metin">Filtreleri sıfırla</span>
     </button>
   </div>
 
@@ -44,7 +44,7 @@
   </div>
 
   <details class="suzgecler" {{if not .Istek.BosMu}}open{{end}}>
-    <summary>Filtreler</summary>
+    <summary>Filtreler{{if .PanelFiltreSayisi}} <span class="filtre-sayaci">{{.PanelFiltreSayisi}}</span>{{end}}</summary>
 
     <div class="suzgec-izgara">
       <label class="alan">
@@ -102,6 +102,20 @@
 </form>
 
 {{if .AramaYapildi}}
+  {{if .Cipler}}
+  <div class="filtre-cipleri" aria-label="Etkin filtreler">
+    {{range .Cipler}}
+      <a class="cip" href="{{.KaldirURL}}" title="Bu filtreyi kaldır">
+        <span class="cip-etiket">{{.Etiket}}:</span> {{.Deger}}
+        <span class="cip-kapat" aria-hidden="true">✕</span>
+      </a>
+    {{end}}
+    {{if gt (len .Cipler) 1}}
+      <a class="cip-hepsi" href="{{.CiplerSiz}}">Tümünü kaldır</a>
+    {{end}}
+  </div>
+  {{end}}
+
   <div class="ozet-cubugu">
     {{if .Cikti.Toplam}}
       <strong>{{sayi .Cikti.Toplam}}</strong> sonuç
@@ -136,6 +150,10 @@
         <span>{{insanBoyut .Boyut}}</span>
         <span>{{tarih .Zaman}}</span>
         <span class="eylemler">
+          {{/* JS olmadan işlevsiz olduğu için gizli gelir; arama.js açar. */}}
+          <button type="button" class="baglanti-buton kopyala-buton" hidden
+                  data-yol="{{.Yol}}" data-ad="{{.Ad}}"
+                  title="Tam yolu kopyala (Shift+tık: yalnızca dosya adı)">Yolu kopyala</button>
           <a href="/dosya/indir?yol={{.Yol}}">İndir</a>
           <form method="POST" action="/dosya/klasorde-goster" class="satir-form">
             <input type="hidden" name="jeton" value="{{$.Jeton}}">

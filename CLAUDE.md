@@ -29,6 +29,13 @@ bugüne çeker. Bu script iki durumda çalıştırılır:
    adımından ÖNCE yapılır (`go:embed` version.txt'yi derleme anında binary'ye
    gömdüğü için — aksi halde header'da bir önceki kurulumun sürümü görünür).
 
+## Sürüm notları (static/yenilikler.json)
+
+Uygulamadaki "Yenilikler" penceresi bu dosyadan beslenir (en yeni sürüm başta).
+Kullanıcının göreceği bir değişiklik kur.ps1 ile kurulmadan önce, kurulumdan sonra
+oluşacak sürüm için (version.txt'deki yama + 1, tarihsiz: ör. `v0.0.9`) bir madde
+eklenir/güncellenir. En üstteki `surum` değişince pencere bir kez kendiliğinden açılır.
+
 ## Commit
 
 Bu depoda asla kendi başına `git commit` çalıştırma. Kullanıcı "commit mesajı"

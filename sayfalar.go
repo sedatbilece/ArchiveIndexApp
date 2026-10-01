@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"html/template"
 	"log"
 	"net/http"
 	"net/url"
@@ -27,6 +28,73 @@ type AramaVerisi struct {
 	CanliSayisi  int
 	TaramaYarim  bool
 	AramaYapildi bool
+
+	Cipler            []FiltreCipi
+	PanelFiltreSayisi int          // "Filtreler (n)" başlığı için; kapsam panelin dışında
+	CiplerSiz         template.URL // metin ve sıralama korunup tüm filtreler kaldırılmış adres
+}
+
+// FiltreCipi etkin bir filtreyi ve onu tek başına kaldıran adresi tutar.
+type FiltreCipi struct {
+	Etiket    string
+	Deger     string
+	KaldirURL template.URL
+}
+
+// filtreCipleri istekteki etkin filtreleri, her biri kendi kaldırma adresiyle döner.
+func filtreCipleri(q url.Values, is sorgu.Istek) (cipler []FiltreCipi, panelSayisi int) {
+	// Sayfa numarası filtre değişince anlamını yitirir; kaldırma adresleri 1. sayfaya döner.
+	kaldir := func(anahtar, deger string) template.URL {
+		yeni := url.Values{}
+		for k, v := range q {
+			if k == "sayfa" {
+				continue
+			}
+			for _, d := range v {
+				if k == anahtar && (deger == "" || strings.EqualFold(d, deger)) {
+					continue
+				}
+				yeni.Add(k, d)
+			}
+		}
+		return template.URL("?" + yeni.Encode())
+	}
+
+	switch is.Kapsam {
+	case sorgu.KapsamAd:
+		cipler = append(cipler, FiltreCipi{"Kapsam", "Sadece dosya adı", kaldir("kapsam", "")})
+	case sorgu.KapsamIcerik:
+		cipler = append(cipler, FiltreCipi{"Kapsam", "Sadece içerik", kaldir("kapsam", "")})
+	}
+	if is.Klasor != "" {
+		cipler = append(cipler, FiltreCipi{"Klasör", is.Klasor, kaldir("klasor", "")})
+	}
+	if !is.Baslangic.IsZero() {
+		cipler = append(cipler, FiltreCipi{"Başlangıç", is.Baslangic.Format("02.01.2006"), kaldir("baslangic", "")})
+	}
+	if !is.Bitis.IsZero() {
+		cipler = append(cipler, FiltreCipi{"Bitiş", is.Bitis.Format("02.01.2006"), kaldir("bitis", "")})
+	}
+	for _, uz := range is.Uzantilar {
+		cipler = append(cipler, FiltreCipi{"Uzantı", uz, kaldir("uzanti", uz)})
+	}
+
+	panelSayisi = len(cipler)
+	if is.Kapsam != sorgu.KapsamHepsi {
+		panelSayisi--
+	}
+	return cipler, panelSayisi
+}
+
+// filtresizAdres arama metnini ve sıralamayı koruyup filtreleri atan adresi döner.
+func filtresizAdres(q url.Values) template.URL {
+	yeni := url.Values{}
+	for _, k := range []string{"q", "sirala"} {
+		if v := q.Get(k); v != "" {
+			yeni.Set(k, v)
+		}
+	}
+	return template.URL("?" + yeni.Encode())
 }
 
 // aramaHandler arama sayfasını ve sonuçlarını gösterir.
@@ -42,6 +110,8 @@ func (u *Uygulama) aramaHandler(w http.ResponseWriter, r *http.Request) {
 		Istek: istek,
 		Sorgu: q,
 	}
+	veri.Cipler, veri.PanelFiltreSayisi = filtreCipleri(q, istek)
+	veri.CiplerSiz = filtresizAdres(q)
 
 	u.ix.Oku(func(o indeks.Okuyucu) {
 		veri.CanliSayisi = o.CanliSayisi()

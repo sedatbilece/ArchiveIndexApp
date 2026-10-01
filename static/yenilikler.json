@@ -1,0 +1,25 @@
+[
+  {
+    "surum": "v0.0.8",
+    "tarih": "01.10.2026",
+    "maddeler": [
+      "Etkin filtreler sonuçların üstünde çip olarak görünüyor; ✕ ile tek tek ya da \"Tümünü kaldır\" ile hepsi birden kaldırılabiliyor.",
+      "\"Filtreler\" başlığında kaç filtrenin etkin olduğu yazıyor.",
+      "Sonuç satırlarına \"Yolu kopyala\" eklendi (Shift+tık yalnızca dosya adını kopyalar).",
+      "Klavye: \"/\" arama kutusuna odaklanır, Esc kutuyu temizler.",
+      "Koyu tema ve sıkı görünüm: üst şeritteki güneş simgesinden seçilebiliyor (varsayılan: sistem teması).",
+      "Dar pencerelerde (ekranın yarısı gibi) düzen artık taşmıyor.",
+      "Sürüm numarasına tıklayınca bu pencere açılıyor; yeni sürümden sonraki ilk açılışta kendiliğinden gösteriliyor.",
+      "Sekme simgesi (favicon) eklendi; tarama sürerken rengi değişiyor."
+    ]
+  },
+  {
+    "surum": "v0.0.7",
+    "tarih": "11.09.2026",
+    "maddeler": [
+      "Uzantı listesinde arama kutusu (uzantı sayısı 8'i geçince).",
+      "\"Filtreleri sıfırla\" butonu.",
+      "Sürüm numarası üst şeritte gösteriliyor."
+    ]
+  }
+]

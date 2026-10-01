@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"arsiv-indeks/internal/indeks"
+	"arsiv-indeks/internal/sorgu"
 )
 
 // ---------------------------------------------------------------- yardımcı
@@ -777,6 +778,50 @@ func TestSorguDegisFiltreleriKorur(t *testing.T) {
 	// Orijinal değiştirilmemeli.
 	if mevcut.Get("sayfa") != "2" {
 		t.Error("sorguDegis girdiyi değiştirdi")
+	}
+}
+
+func TestFiltreCipleri(t *testing.T) {
+	q := url.Values{
+		"q":         {"beton"},
+		"kapsam":    {"ad"},
+		"klasor":    {`C:\Arsiv\2024`},
+		"baslangic": {"2024-01-05"},
+		"uzanti":    {".pdf", ".docx"},
+		"sirala":    {"tarih"},
+		"sayfa":     {"3"},
+	}
+	cipler, panel := filtreCipleri(q, sorgu.Ayristir(q, 20))
+
+	if len(cipler) != 5 {
+		t.Fatalf("5 çip bekleniyordu (kapsam, klasör, başlangıç, 2 uzantı), gelen %d: %+v", len(cipler), cipler)
+	}
+	if panel != 4 {
+		t.Errorf("panel sayacı kapsamı saymamalı: beklenen 4, gelen %d", panel)
+	}
+
+	var pdf FiltreCipi
+	for _, c := range cipler {
+		if c.Deger == ".pdf" {
+			pdf = c
+		}
+	}
+	adres := string(pdf.KaldirURL)
+	if strings.Contains(adres, "uzanti=.pdf") || !strings.Contains(adres, "uzanti=.docx") {
+		t.Errorf(".pdf çipi yalnızca kendi değerini kaldırmalı: %s", adres)
+	}
+	if strings.Contains(adres, "sayfa=") {
+		t.Errorf("filtre kaldırınca 1. sayfaya dönülmeli: %s", adres)
+	}
+	for _, korunan := range []string{"q=beton", "kapsam=ad", "sirala=tarih"} {
+		if !strings.Contains(adres, korunan) {
+			t.Errorf("%q korunmadı: %s", korunan, adres)
+		}
+	}
+
+	hepsi := string(filtresizAdres(q))
+	if hepsi != "?q=beton&sirala=tarih" {
+		t.Errorf("filtresiz adres yanlış: %s", hepsi)
 	}
 }
 
