@@ -154,3 +154,27 @@ func esitMi(t *testing.T, g, beklenen []string) {
 		}
 	}
 }
+
+// İndeks CamelCase ve harf-rakam parçalarını da tutar; sorgu bütün kelimeyi arar.
+func TestTekilBelirteclerCamelCaseParcalar(t *testing.T) {
+	g := TekilBelirtecler("UserService Rapor2024", 0)
+	esitMi(t, g, []string{"userservice", "user", "service", "rapor2024", "rapor", "2024"})
+
+	esitMi(t, Belirtecler("UserService"), []string{"userservice"})
+}
+
+func TestTekilBelirteclerSinirliKesildiBildirir(t *testing.T) {
+	if _, kesildi := TekilBelirteclerSinirli("alfa beta gama", 3); kesildi {
+		t.Error("tam sınıra denk gelen metin kesildi sayıldı")
+	}
+	g, kesildi := TekilBelirteclerSinirli("alfa beta gama delta", 3)
+	if !kesildi || len(g) != 3 {
+		t.Errorf("kesildi = %v, belirteç = %d; beklenen true, 3", kesildi, len(g))
+	}
+}
+
+func TestIfadeBicimi(t *testing.T) {
+	if g := IfadeBicimi("  Proje-Planı,  v2!"); g != "proje plani v2" {
+		t.Errorf("IfadeBicimi = %q", g)
+	}
+}

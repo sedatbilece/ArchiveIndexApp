@@ -14,13 +14,18 @@ döner. Tek `.exe`, yalnızca `127.0.0.1`'i dinler, hiçbir veri bilgisayardan
 
 - **İçerik araması** — `.txt`, kod dosyaları, `.docx/.xlsx/.pptx` ve `.pdf`
   içinde tam metin arama; dosya adını hatırlamak gerekmez.
-- **Türkçe duyarlı** — `ı/i/İ`, `ç/ş/ğ/ö/ü` katlanır: `santiye` = `Şantiye` = `ŞANTIYE`.
+- **Türkçe duyarlı** — `ı/i/İ`, `ç/ş/ğ/ö/ü` katlanır: `santiye` = `Şantiye` = `ŞANTIYE`;
+  kelimenin başı yeter: `rapor` → raporu, raporlar.
+- **Sorgu dili** — `"tam ifade"`, `-hariç`, `a VEYA b`, `ra*`, `ad:`, `klasor:`,
+  `uzanti:pdf`; sonuç çıkmazsa yazım önerisi ("dockr" → "docker").
+- **Yazarken arama** — sonuçlar Enter'a basmadan gelir; ↑↓ ile seçilir.
 - **Filtreler** — uzantı, klasör, tarih aralığı, sıralama; her arama URL'e
   yansır, yer imine eklenebilir.
 - **Artımlı tarama** — değişmeyen dosyalar yeniden okunmaz; tarama sürerken
   arama kesintisiz çalışır.
-- **Sonuçtan dosyaya** — eşleşmeler vurgulanır, dosya indirilebilir veya
-  Gezgin'de gösterilebilir.
+- **Sonuçtan dosyaya** — eşleşmeler vurgulanır, eşleşmenin adda mı klasörde mi
+  içerikte mi olduğu rozetle gösterilir; dosya tek tıkla (ya da Enter ile)
+  açılır, indirilir veya Gezgin'de gösterilir.
 - **Gizlilik ve güvenlik** — yalnızca yerel erişim, CSRF korumalı uç noktalar,
   dosya içeriğinden XSS'e karşı yapısal koruma.
 

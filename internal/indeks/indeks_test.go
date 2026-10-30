@@ -3,6 +3,7 @@ package indeks
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -364,4 +365,21 @@ func TestUzantilarVeUstKlasorler(t *testing.T) {
 			t.Fatalf("üst klasörler = %v, beklenen 2 tane", k)
 		}
 	})
+}
+
+func TestOnekliTerimlerYazmadanSonraGuncellenir(t *testing.T) {
+	ix := Yeni()
+	ix.EkleToplu([]Girdi{{Yol: `C:\A\a.txt`, Belirtecler: []string{"rapor", "raporu", "rampa"}}})
+
+	var g []string
+	ix.Oku(func(o Okuyucu) { g = o.OnekliTerimler("rapor", 10) })
+	if strings.Join(g, ",") != "rapor,raporu" {
+		t.Fatalf("önekli terimler = %v", g)
+	}
+
+	ix.EkleToplu([]Girdi{{Yol: `C:\A\b.txt`, Belirtecler: []string{"raporlar"}}})
+	ix.Oku(func(o Okuyucu) { g = o.OnekliTerimler("rapor", 10) })
+	if strings.Join(g, ",") != "rapor,raporlar,raporu" {
+		t.Errorf("yazmadan sonra liste yenilenmedi: %v", g)
+	}
 }

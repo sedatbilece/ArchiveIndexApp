@@ -1,6 +1,7 @@
 package sorgu
 
 import (
+	"context"
 	"net/url"
 	"strings"
 	"testing"
@@ -465,5 +466,208 @@ func TestParcacikEslesmeYoksaBastanAlinti(t *testing.T) {
 func TestParcacikBosIcerik(t *testing.T) {
 	if p := Parcacik("", []string{"beton"}, 40); p != nil {
 		t.Errorf("boş içerik için nil beklenirdi: %+v", p)
+	}
+}
+
+// ---------------------------------------------------------------- sorgu dili
+
+func ara(ix *indeks.Indeks, metin string) Cikti {
+	return Calistir(ix, Istek{Metin: metin, Sayfa: 1, Adet: 25})
+}
+
+// Türkçe ekler: "rapor" yazınca içerikte yalnızca "raporu" geçen dosya da gelmeli.
+func TestOnekIcerikteEkliBicimleriBulur(t *testing.T) {
+	ix := indeksKur(
+		girdi(`C:\A\bir.txt`, 1, "raporu"),
+		girdi(`C:\A\iki.txt`, 2, "raporlama"),
+		girdi(`C:\A\uc.txt`, 3, "rampa"),
+	)
+	c := Calistir(ix, Istek{Metin: "rapor", Kapsam: KapsamIcerik, Sayfa: 1, Adet: 25})
+	if c.Toplam != 2 || icerirYol(c, "uc.txt") {
+		t.Errorf("önek araması = %v", yollar(c))
+	}
+}
+
+func TestKisaKelimeOtomatikOnekAlmazYildizlaAlir(t *testing.T) {
+	ix := indeksKur(girdi(`C:\A\bir.txt`, 1, "raporu"))
+	if c := Calistir(ix, Istek{Metin: "ra", Kapsam: KapsamIcerik, Sayfa: 1, Adet: 25}); c.Toplam != 0 {
+		t.Errorf("iki harf kendiliğinden önek olmamalı: %v", yollar(c))
+	}
+	if c := Calistir(ix, Istek{Metin: "ra*", Kapsam: KapsamIcerik, Sayfa: 1, Adet: 25}); c.Toplam != 1 {
+		t.Errorf("ra* önek olarak aranmalı: %v", yollar(c))
+	}
+}
+
+func TestTamEslesmeOnekEslesmesindenOnceGelir(t *testing.T) {
+	ix := indeksKur(
+		girdi(`C:\A\bir.txt`, 2, "raporlama"),
+		girdi(`C:\A\iki.txt`, 1, "rapor"),
+	)
+	c := Calistir(ix, Istek{Metin: "rapor", Kapsam: KapsamIcerik, Sirala: SiralaSkor, Sayfa: 1, Adet: 25})
+	if len(c.Sonuclar) != 2 || c.Sonuclar[0].Ad != "iki.txt" {
+		t.Errorf("tam eşleşme önce gelmeliydi: %v", yollar(c))
+	}
+}
+
+func TestVeyaOperatoru(t *testing.T) {
+	ix := indeksKur(
+		girdi(`C:\A\bir.txt`, 1, "fatura"),
+		girdi(`C:\A\iki.txt`, 2, "irsaliye"),
+		girdi(`C:\A\uc.txt`, 3, "teklif"),
+	)
+	for _, s := range []string{"fatura VEYA irsaliye", "fatura veya irsaliye", "fatura | irsaliye", "fatura OR irsaliye"} {
+		if c := ara(ix, s); c.Toplam != 2 || icerirYol(c, "uc.txt") {
+			t.Errorf("%q = %v", s, yollar(c))
+		}
+	}
+}
+
+func TestHaricOperatoru(t *testing.T) {
+	ix := indeksKur(
+		girdi(`C:\A\bir.txt`, 1, "proje", "taslak"),
+		girdi(`C:\A\iki.txt`, 2, "proje"),
+	)
+	c := ara(ix, "proje -taslak")
+	if c.Toplam != 1 || !icerirYol(c, "iki.txt") {
+		t.Errorf("hariç tutma çalışmadı: %v", yollar(c))
+	}
+	// Hariçte otomatik önek yok: "-tas" taslak'ı atmamalı.
+	if c := ara(ix, "proje -tas"); c.Toplam != 2 {
+		t.Errorf("-tas önek gibi davrandı: %v", yollar(c))
+	}
+}
+
+func TestTamIfadeAdda(t *testing.T) {
+	ix := indeksKur(
+		girdi(`C:\A\Proje Planı.docx`, 1),
+		girdi(`C:\A\plan proje.docx`, 2),
+	)
+	c := ara(ix, `"proje plan"`)
+	if c.Toplam != 1 || !icerirYol(c, "Proje Planı.docx") {
+		t.Errorf("tam ifade = %v", yollar(c))
+	}
+}
+
+func TestTamIfadeIcerikteMetinOkuyarakDogrulanir(t *testing.T) {
+	ix := indeksKur(
+		girdi(`C:\A\bir.txt`, 1, "beton", "dokumu"),
+		girdi(`C:\A\iki.txt`, 2, "beton", "dokumu"),
+	)
+	metinler := map[string]string{
+		`C:\A\bir.txt`: "Burada beton dökümü yapıldı.",
+		`C:\A\iki.txt`: "Döküm sonrası beton kontrol edildi, dökümü ertelendi.",
+	}
+	oku := func(_ context.Context, yol string) (string, bool) {
+		m, v := metinler[yol]
+		return m, v
+	}
+	c := Calistir(ix, Istek{Metin: `"beton dökümü"`, Sayfa: 1, Adet: 25, IcerikOku: oku})
+	if c.Toplam != 1 || !icerirYol(c, "bir.txt") {
+		t.Errorf("içerikte tam ifade = %v", yollar(c))
+	}
+	if c.Uyari != "" {
+		t.Errorf("beklenmeyen uyarı: %s", c.Uyari)
+	}
+}
+
+func TestAlanOperatorleri(t *testing.T) {
+	ix := indeksKur(
+		girdi(`C:\Arsiv\2024\teklif.pdf`, 1, "fiyat"),
+		girdi(`C:\Arsiv\2023\teklif.docx`, 2, "fiyat"),
+		girdi(`C:\Arsiv\2024\notlar.txt`, 3, "teklif"),
+	)
+	if c := ara(ix, "ad:teklif"); c.Toplam != 2 || icerirYol(c, "notlar.txt") {
+		t.Errorf("ad: = %v", yollar(c))
+	}
+	if c := ara(ix, "teklif klasor:2024"); c.Toplam != 2 || icerirYol(c, "teklif.docx") {
+		t.Errorf("klasor: = %v", yollar(c))
+	}
+	if c := ara(ix, "teklif uzanti:pdf"); c.Toplam != 1 || !icerirYol(c, "teklif.pdf") {
+		t.Errorf("uzanti: = %v", yollar(c))
+	}
+	if c := ara(ix, "uzantı:PDF,docx"); c.Toplam != 2 {
+		t.Errorf("yalnızca uzanti: = %v", yollar(c))
+	}
+}
+
+// Durak kelime zorunlu tutulmamalı: "rapor ve fatura" adında "ve" geçmeyeni de bulur.
+func TestDurakKelimeSorguyuDaraltmaz(t *testing.T) {
+	ix := indeksKur(girdi(`C:\A\bir.txt`, 1, "rapor", "fatura"))
+	if c := ara(ix, "rapor ve fatura"); c.Toplam != 1 {
+		t.Errorf("durak kelime sonucu eledi: %v", yollar(c))
+	}
+}
+
+func TestSonucYoksaYazimOnerisi(t *testing.T) {
+	ix := indeksKur(
+		girdi(`C:\A\bir.txt`, 1, "docker", "rapor"),
+		girdi(`C:\A\iki.txt`, 2, "docker"),
+	)
+	c := ara(ix, "dockr rapor")
+	if c.Toplam != 0 {
+		t.Fatalf("sonuç beklenmiyordu: %v", yollar(c))
+	}
+	if c.Oneri != "docker rapor" {
+		t.Errorf("öneri = %q, beklenen %q", c.Oneri, "docker rapor")
+	}
+}
+
+func TestEslesmeAlanlari(t *testing.T) {
+	ix := indeksKur(
+		girdi(`C:\Beton\rapor.txt`, 1, "beton"),
+		girdi(`C:\A\beton.txt`, 2),
+	)
+	c := ara(ix, "beton")
+	alanlar := map[string]string{}
+	for _, s := range c.Sonuclar {
+		alanlar[s.Ad] = strings.Join(s.Alanlar, ",")
+	}
+	if alanlar["beton.txt"] != AlanAd {
+		t.Errorf("beton.txt alanları = %q", alanlar["beton.txt"])
+	}
+	if alanlar["rapor.txt"] != AlanKlasor+","+AlanIcerik {
+		t.Errorf("rapor.txt alanları = %q", alanlar["rapor.txt"])
+	}
+}
+
+func TestUcuncuTarafBelgeleriGeriItilir(t *testing.T) {
+	ix := indeksKur(
+		girdi(`C:\A\jmeter\docs\api\configuration.html`, 2),
+		girdi(`C:\A\notlar\configuration.md`, 1),
+	)
+	c := Calistir(ix, Istek{Metin: "configuration", Sirala: SiralaSkor, Sayfa: 1, Adet: 25})
+	if len(c.Sonuclar) != 2 || c.Sonuclar[0].Ad != "configuration.md" {
+		t.Errorf("üçüncü taraf belge önce geldi: %v", yollar(c))
+	}
+}
+
+func TestParcacikBirdenCokPencere(t *testing.T) {
+	icerik := "beton " + strings.Repeat("dolgu ", 100) + "cimento " + strings.Repeat("dolgu ", 100) + "son"
+	var vurgulu []string
+	for _, p := range Parcacik(icerik, []string{"beton", "cimento"}, 40) {
+		if p.Vurgulu {
+			vurgulu = append(vurgulu, p.Metin)
+		}
+	}
+	if strings.Join(vurgulu, ",") != "beton,cimento" {
+		t.Errorf("iki ayrı eşleşme gösterilmeliydi: %v", vurgulu)
+	}
+}
+
+func TestBenzerlikEnIyiSonucaGoreYuzde(t *testing.T) {
+	ix := indeksKur(
+		girdi(`C:\A\beton.txt`, 1, "beton"),
+		girdi(`C:\A\rapor.txt`, 2, "beton"),
+	)
+	c := Calistir(ix, Istek{Metin: "beton", Sirala: SiralaSkor, Sayfa: 1, Adet: 25})
+	if c.Sonuclar[0].Benzerlik != 100 || c.Sonuclar[1].Benzerlik <= 0 || c.Sonuclar[1].Benzerlik >= 100 {
+		t.Errorf("benzerlik = %d, %d", c.Sonuclar[0].Benzerlik, c.Sonuclar[1].Benzerlik)
+	}
+	// Alaka dışı sıralamada ve yalnızca filtreyle aramada gösterilmez.
+	if c := Calistir(ix, Istek{Metin: "beton", Sirala: SiralaTarihYeni, Sayfa: 1, Adet: 25}); c.Sonuclar[0].Benzerlik != 0 {
+		t.Error("tarih sıralamasında benzerlik gösterildi")
+	}
+	if c := Calistir(ix, Istek{Uzantilar: []string{".txt"}, Sirala: SiralaSkor, Sayfa: 1, Adet: 25}); c.Sonuclar[0].Benzerlik != 0 {
+		t.Error("puansız aramada benzerlik gösterildi")
 	}
 }

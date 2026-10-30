@@ -61,6 +61,63 @@ gömülü kopya kullanılır, yeniden derlemek gerekir.
 - **Sadece içerik** — dosya adı eşleşmeleri gelmez. İçerik ve yol
   belirteçleri indekste ayrı haritalarda tutulduğu için bu ayrım gerçektir.
 
+Çok kelimeli aramada her kelime ayrı ayrı ad, yol veya içerikte aranır ve
+hepsi bulunmalıdır (VE): biri adda, öteki içerikte geçen dosya da gelir.
+Durak kelimeler (`ve`, `the`…) ve tek harfler sonucu daraltmaz.
+
+Sonuçlar yazdıkça gelir (Enter gerekmez); adres çubuğu her aramayla
+güncellenir.
+
+### Sorgu dili
+
+| Yazım | Anlamı |
+|---|---|
+| `rapor` | 3+ harfli kelimeler **önek** olarak aranır: raporu, raporlar, raporlama |
+| `ra*` | Kısa kelimede önek için yıldız |
+| `"proje planı"` | Tam ifade: kelimeler yan yana geçmeli |
+| `-taslak` | Hariç tut (önek yok; `-tas*` önekli) |
+| `fatura VEYA irsaliye` | İkisinden biri (`veya`, `OR`, `\|` de olur) |
+| `ad:teklif` | Yalnızca dosya adında |
+| `klasor:2024` | Klasör yolunda geçen (alt dize) |
+| `uzanti:pdf` | Uzantı; `uzanti:pdf,docx` birden çok |
+
+**Önek** Türkçe eklerin yarattığı kaçırmaları kapatır; kökten bulma
+(stemming) yapmadan "rapor" ile "raporumuzda"yı birleştirir. Bedeli,
+İngilizce metinlerde "proje"nin "projects"i de getirmesidir; bu yüzden tam
+kelime eşleşmeleri sıralamada öne alınır (bkz. Skorlama). Bir önek en fazla
+400 terime açılır.
+
+**Tam ifade** indeks konum tutmadığı için (bkz. §12) önce kelimelerin hepsini
+içeren dosyalar bulunur, sonra ad/yolda ya da dosya metni yeniden okunarak
+yan yanalık doğrulanır. Doğrulama alaka sırasıyla en fazla 300 dosya ve 2,5 sn
+sürer; bütçe biterse kalanlar elenmez ve sonuçların üstünde uyarı çıkar.
+
+**Sonuç yoksa** sözlükte düzenleme mesafesi 1–2 olan en yaygın terim önerilir
+("dockr" → "docker"), filtreler ya da kapsam etkinse onları kaldıran
+bağlantılar gösterilir.
+
+### Sonuç satırı ve klavye
+
+Rozetler eşleşmenin nerede olduğunu söyler (**ad** mavi, **klasör** amber,
+**içerik** yeşil); parçacık içerikteki en fazla üç ayrı eşleşmeyi gösterir.
+Alaka sıralamasında sağ üstteki yüzde, puanın en iyi sonuca oranıdır (en iyi
+sonuç %100); ham puan ipucunda görünür. Ham puan sorgudan sorguya ölçeksiz
+olduğu için yalnızca aynı aramanın sonuçları arasında karşılaştırılabilir.
+
+| Tuş | Ne yapar |
+|---|---|
+| `/` | Arama kutusuna odaklanır |
+| `↑` `↓` | Sonuçlar arasında gezer (satıra tıklamak da seçer) |
+| `Enter` | Seçili dosyayı varsayılan uygulamayla açar (çift tıklama da) |
+| `Ctrl+Enter` | Seçili dosyayı Gezgin'de gösterir |
+| `Ctrl+C` | Seçili dosyanın yolunu kopyalar (`Ctrl+Shift+C`: yalnızca adı) |
+| `Esc` | Seçimi, sonra kutuyu temizler |
+
+**Aç** `ShellExecuteW` ile çalışır (komut satırı kurulmaz, dosya adıyla
+enjeksiyon olmaz). Kod çalıştıran türler (`.bat .cmd .ps1 .js .vbs .lnk .hta
+.msi`…) yanlışlıkla bir Enter'la çalışmasın diye açılmaz, Gezgin'de seçili
+gösterilir.
+
 ### Türkçe harf katlaması
 
 `ı i I İ` hepsi `i`'ye, `ç→c ğ→g ö→o ş→s ü→u` katlanır. Yani şunların hepsi
@@ -82,9 +139,24 @@ paylaşabilir, geri tuşunu kullanabilirsiniz.
 
 ### Skorlama
 
-`Σ idf(terim) × alan çarpanı`, çarpanlar: **ad ×3, klasör/yol ×2, içerik ×1**.
+`Σ idf(kelime) × alan çarpanı`, çarpanlar: **ad ×3, klasör/yol ×2, içerik ×1**.
 Arşivde dosya adı içerikten çok daha güçlü bir sinyaldir. Eşitlikte yeni
 dosya öne gelir.
+
+Eşleşmenin biçimi de çarpılır: tam kelime ×1, kelimenin başı (önek) ×0,7,
+kelimenin içi ×0,5. Böylece "rapor" araması `rapor.md`yi
+`deneme-raporu.md`nin, "proje" araması `proje.docx`i `projects.html`in önüne
+koyar. Tüm sorgu dosya adında yan yana geçiyorsa ×1,5.
+
+Üçüncü taraf belge/paket klasörleri (`\docs\api\`, `\javadoc\`, `\vendor\`,
+`\site-packages\`, `\packages\`…) ×0,5 ile geri itilir; elenmez.
+
+### CamelCase ve sayılar
+
+İndeks `UserService` için `userservice`, `user` ve `service`; `Rapor2024`
+için `rapor2024`, `rapor` ve `2024` terimlerini tutar. Sorgu ise bölünmez:
+`userservice` bitişik yazılmış her şeyi, `user service` ayrı ve CamelCase
+yazılmışları bulur.
 
 ---
 
@@ -112,6 +184,10 @@ Bunlar **yalnızca adıyla** indekslenir ve arayüzde nedeni etiketle gösterili
   indirme demektir.
 - **Boyut sınırını aşanlar**, **kilitli dosyalar**, **ikili dosyalar**
   (uzantısı `.txt` olsa bile).
+
+Ayrıca dosya başına en fazla **10.000 farklı terim** indekslenir (Ayarlar →
+"Doküman başına terim sınırı"); tek bir bozuk PDF'in sözlüğü şişirmesini
+engeller. Sınıra takılan dosya *"içerik kısmen indeksli"* etiketi alır.
 
 Tarama bitince Ayarlar sayfasındaki özet kaç dosyanın yalnızca adıyla
 indekslendiğini söyler — neyin aranabilir **olmadığını** bilmek önemlidir.

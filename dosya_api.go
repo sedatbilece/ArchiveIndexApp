@@ -68,7 +68,7 @@ func (u *Uygulama) klasordeGosterHandler(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	if err := klasordeGoster(yol); err != nil {
+	if err := klasordeGosterFn(yol); err != nil {
 		log.Printf("gezgin açılamadı: %v", err)
 		http.Error(w, "gezgin açılamadı", http.StatusInternalServerError)
 		return
@@ -82,6 +82,67 @@ func (u *Uygulama) klasordeGosterHandler(w http.ResponseWriter, r *http.Request)
 	// geldiği sayfaya geri yönlendiriyoruz.
 	if jsonIstiyorMu(r) {
 		jsonYaz(w, http.StatusOK, map[string]any{"tamam": true})
+		return
+	}
+	http.Redirect(w, r, geriDonulecekYol(r), http.StatusSeeOther)
+}
+
+// dosyaAc ve klasordeGosterFn testlerde gerçek süreç açmamak için değiştirilebilir.
+var (
+	dosyaAc          = sistemdeAc
+	klasordeGosterFn = klasordeGoster
+)
+
+// calistirilabilirUzantilar doğrudan açıldığında kod çalıştıran türlerdir.
+// Arşivdeki bir betiğin yanlışlıkla Enter'la çalışmaması için bunlar
+// açılmaz, Gezgin'de seçili gösterilir.
+var calistirilabilirUzantilar = map[string]bool{
+	".exe": true, ".com": true, ".bat": true, ".cmd": true, ".ps1": true,
+	".psm1": true, ".vbs": true, ".vbe": true, ".js": true, ".jse": true,
+	".wsf": true, ".wsh": true, ".hta": true, ".scr": true, ".msi": true,
+	".msp": true, ".lnk": true, ".url": true, ".reg": true, ".cpl": true,
+	".jar": true, ".pif": true, ".application": true, ".appref-ms": true,
+	".msc": true, ".inf": true, ".scf": true, ".sct": true, ".chm": true,
+	".settingcontent-ms": true, ".library-ms": true, ".gadget": true, ".ws": true,
+}
+
+// dosyaAcHandler dosyayı varsayılan uygulamasıyla açar.
+//
+// klasordeGosterHandler gibi bir SÜREÇ başlattığı için POST'tur ve jeton
+// kontrolünden geçer.
+func (u *Uygulama) dosyaAcHandler(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "form okunamadı", http.StatusBadRequest)
+		return
+	}
+	if !u.jetonKontrol(r) {
+		http.Error(w, "oturum jetonu geçersiz, sayfayı yenileyin", http.StatusForbidden)
+		return
+	}
+	yol, err := u.istenenYol(r.FormValue("yol"))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusForbidden)
+		return
+	}
+	if bilgi, err := os.Stat(yol); err != nil || bilgi.IsDir() {
+		http.Error(w, "dosya bulunamadı", http.StatusNotFound)
+		return
+	}
+
+	klasorde := calistirilabilirUzantilar[strings.ToLower(filepath.Ext(yol))]
+	if klasorde {
+		err = klasordeGosterFn(yol)
+	} else {
+		err = dosyaAc(yol)
+	}
+	if err != nil {
+		log.Printf("dosya açılamadı: %v", err)
+		http.Error(w, "dosya açılamadı", http.StatusInternalServerError)
+		return
+	}
+
+	if jsonIstiyorMu(r) {
+		jsonYaz(w, http.StatusOK, map[string]any{"tamam": true, "klasorde": klasorde})
 		return
 	}
 	http.Redirect(w, r, geriDonulecekYol(r), http.StatusSeeOther)

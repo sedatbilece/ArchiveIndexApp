@@ -208,3 +208,36 @@ func TestIsciAdedi(t *testing.T) {
 		t.Errorf("işçi sayısı = %d, beklenen 3", n)
 	}
 }
+
+// Eski ayar dosyası: yeni varsayılanlar bir kez eklenir, kullanıcı değerleri korunur.
+func TestEskiAyarDosyasiGecisi(t *testing.T) {
+	dizin := t.TempDir()
+	eski := `{"haricKlasorler":["benim"],"haricUzantilar":[".zip"],"dokumanBelirtecCap":2000,"sayfaBasiSonuc":50}`
+	if err := os.WriteFile(filepath.Join(dizin, DosyaAdi), []byte(eski), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	a, err := Yukle(dizin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if a.DokumanBelirtecCap != 10_000 {
+		t.Errorf("terim sınırı = %d, beklenen 10000", a.DokumanBelirtecCap)
+	}
+	if !a.HaricKlasorMu("benim") || !a.HaricKlasorMu("bin") || !a.HaricUzantiMi(".map") {
+		t.Errorf("hariç listeleri birleşmedi: %v %v", a.HaricKlasorler, a.HaricUzantilar)
+	}
+	if a.SayfaBasiSonuc != 50 || a.AyarSurumu != GuncelAyarSurumu {
+		t.Errorf("sayfa=%d sürüm=%d", a.SayfaBasiSonuc, a.AyarSurumu)
+	}
+
+	// Güncel sürümde kullanıcının seçtiği sınır ve çıkardığı öğe geri gelmemeli.
+	a.DokumanBelirtecCap = 2000
+	a.HaricKlasorler = []string{"benim"}
+	if err := a.Kaydet(dizin); err != nil {
+		t.Fatal(err)
+	}
+	b, _ := Yukle(dizin)
+	if b.DokumanBelirtecCap != 2000 || b.HaricKlasorMu("bin") {
+		t.Errorf("geçiş ikinci kez çalıştı: sınır=%d klasörler=%v", b.DokumanBelirtecCap, b.HaricKlasorler)
+	}
+}

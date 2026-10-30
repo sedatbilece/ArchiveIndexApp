@@ -7,3 +7,7 @@ import "errors"
 func klasordeGoster(string) error {
 	return errors.New("bu islem yalnizca Windows uzerinde desteklenir")
 }
+
+func sistemdeAc(string) error {
+	return errors.New("bu islem yalnizca Windows uzerinde desteklenir")
+}

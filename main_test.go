@@ -32,8 +32,17 @@ func kurulum(t *testing.T) (*Uygulama, string) {
 	if err != nil {
 		t.Fatalf("uygulama kurulamadı: %v", err)
 	}
+	// Testler masaüstünde Gezgin ya da uygulama penceresi açmasın.
+	acilan = nil
+	eskiAc, eskiGoster := dosyaAc, klasordeGosterFn
+	dosyaAc = func(yol string) error { acilan = append(acilan, "ac:"+yol); return nil }
+	klasordeGosterFn = func(yol string) error { acilan = append(acilan, "goster:"+yol); return nil }
+	t.Cleanup(func() { dosyaAc, klasordeGosterFn = eskiAc, eskiGoster })
 	return u, arsiv
 }
+
+// acilan sahte dosyaAc/klasordeGosterFn çağrılarını kaydeder.
+var acilan []string
 
 // ornekArsivKur planda listelenen doğrulama senaryolarını karşılayan bir
 // dosya ağacı üretir.
@@ -1011,6 +1020,112 @@ func TestGeriDonulecekYolAcikYonlendirmeyiEngeller(t *testing.T) {
 		if g := geriDonulecekYol(r); g != tt.beklenen {
 			t.Errorf("geriDonulecekYol(%q) = %q, beklenen %q",
 				tt.referer, g, tt.beklenen)
+		}
+	}
+}
+
+func TestDosyaAcVarsayilanUygulamayla(t *testing.T) {
+	u, arsiv := kurulum(t)
+	ayarKaydet(t, u, arsiv)
+
+	yol := filepath.Join(arsiv, "2024", "teklif.md")
+	r := istek("POST", "/dosya/ac", url.Values{"jeton": {u.jeton}, "yol": {yol}})
+	r.Header.Set("Accept", "application/json")
+	w := cagir(u, r)
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"klasorde":false`) {
+		t.Fatalf("kod = %d, gövde = %s", w.Code, w.Body.String())
+	}
+	if len(acilan) != 1 || !strings.EqualFold(acilan[0], "ac:"+yol) {
+		t.Errorf("açılan = %v", acilan)
+	}
+}
+
+// Betik gibi kod çalıştıran türler açılmamalı, klasörde gösterilmeli.
+func TestDosyaAcBetigiCalistirmaz(t *testing.T) {
+	u, arsiv := kurulum(t)
+	ayarKaydet(t, u, arsiv)
+	yol := filepath.Join(arsiv, "2024", "kur.bat")
+	if err := os.WriteFile(yol, []byte("echo hi"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	r := istek("POST", "/dosya/ac", url.Values{"jeton": {u.jeton}, "yol": {yol}})
+	r.Header.Set("Accept", "application/json")
+	w := cagir(u, r)
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"klasorde":true`) {
+		t.Fatalf("kod = %d, gövde = %s", w.Code, w.Body.String())
+	}
+	if len(acilan) != 1 || !strings.EqualFold(acilan[0], "goster:"+yol) {
+		t.Errorf("betik açıldı: %v", acilan)
+	}
+}
+
+func TestDosyaAcJetonsuzVeKokDisiniReddeder(t *testing.T) {
+	u, arsiv := kurulum(t)
+	ayarKaydet(t, u, arsiv)
+
+	w := cagir(u, istek("POST", "/dosya/ac", url.Values{"yol": {filepath.Join(arsiv, "2024", "teklif.md")}}))
+	if w.Code != http.StatusForbidden {
+		t.Errorf("jetonsuz kod = %d", w.Code)
+	}
+	w = cagir(u, istek("POST", "/dosya/ac", url.Values{"jeton": {u.jeton}, "yol": {os.Args[0]}}))
+	if w.Code != http.StatusForbidden {
+		t.Errorf("kök dışı kod = %d", w.Code)
+	}
+	if len(acilan) != 0 {
+		t.Errorf("reddedilen istek dosya açtı: %v", acilan)
+	}
+}
+
+// Canlı arama yalnızca sonuç bölümünü ister; parca parametresi bağlantılara sızmamalı.
+func TestAramaParcaliYalnizcaSonuclariDoner(t *testing.T) {
+	u, arsiv := kurulum(t)
+	ayarKaydet(t, u, arsiv)
+	taramaCalistir(t, u, false)
+
+	w := cagir(u, istek("GET", "/arama?q=bet&kapsam=icerik&parca=sonuclar", nil))
+	govde := w.Body.String()
+	if w.Code != http.StatusOK {
+		t.Fatalf("kod = %d", w.Code)
+	}
+	if strings.Contains(govde, "<html") || strings.Contains(govde, "arama-form") {
+		t.Error("parçalı yanıt tüm sayfayı içeriyor")
+	}
+	if !strings.Contains(govde, "Raporu.txt") || !strings.Contains(govde, `class="rozet rozet-`) {
+		t.Errorf("önekli içerik araması ya da rozet yok:\n%s", govde)
+	}
+	if strings.Contains(govde, "parca=") {
+		t.Error("parca parametresi bağlantılara sızdı")
+	}
+}
+
+func TestAramaSonucYoksaOneriVeYardim(t *testing.T) {
+	u, arsiv := kurulum(t)
+	ayarKaydet(t, u, arsiv)
+	taramaCalistir(t, u, false)
+
+	govde := cagir(u, istek("GET", "/arama?q=betn&kapsam=icerik", nil)).Body.String()
+	if !strings.Contains(govde, "Bunu mu demek istediniz") || !strings.Contains(govde, ">beton</a>") {
+		t.Error("yazım önerisi gösterilmedi")
+	}
+	if !strings.Contains(govde, "Ad ve içerikte ara") {
+		t.Error("kapsamı genişletme bağlantısı yok")
+	}
+}
+
+// Sürüm uyuşmazlığı uyarısı, yeni indeksle tarama bitince kaybolmalı.
+func TestIndeksHatasiTaramadanSonraGizlenir(t *testing.T) {
+	u, arsiv := kurulum(t)
+	u.indeksHata = "indeks sürümü 1, bu uygulama 2 bekliyor; yeniden tarama gerekli"
+	ayarKaydet(t, u, arsiv)
+
+	if g := cagir(u, istek("GET", "/arama", nil)).Body.String(); !strings.Contains(g, "yeniden tarama gerekli") {
+		t.Fatal("tarama öncesi uyarı gösterilmedi")
+	}
+	taramaCalistir(t, u, false)
+	for _, adres := range []string{"/arama", "/ayarlar"} {
+		if g := cagir(u, istek("GET", adres, nil)).Body.String(); strings.Contains(g, "yeniden tarama gerekli") {
+			t.Errorf("%s: tarama bittiği halde uyarı duruyor", adres)
 		}
 	}
 }

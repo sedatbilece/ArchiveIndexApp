@@ -1,6 +1,9 @@
 package metin
 
-import "strings"
+import (
+	"strings"
+	"unicode"
+)
 
 // Sözlük (vocabulary) denetim kaldıraçları.
 //
@@ -70,20 +73,35 @@ func Belirtecler(s string) []string {
 // maks 0'dan büyükse o kadar tekil belirteçten sonra durur — tek bir bozuk
 // PDF'in sözlüğe 50 bin çöp terim eklemesine karşı tek korumamız budur.
 func TekilBelirtecler(s string, maks int) []string {
+	cikti, _ := TekilBelirteclerSinirli(s, maks)
+	return cikti
+}
+
+// TekilBelirteclerSinirli TekilBelirtecler gibidir; ek olarak sınıra takılıp
+// metnin geri kalanının atlanıp atlanmadığını söyler.
+//
+// Sorgudan farklı olarak CamelCase parçaları da üretir ("UserService" →
+// userservice, user, service): sorgu bütün kelimeyi, indeks ise hem bütünü
+// hem parçaları tuttuğu için iki yazım da eşleşir.
+func TekilBelirteclerSinirli(s string, maks int) (cikti []string, kesildi bool) {
 	if maks <= 0 {
 		maks = VarsayilanCap
 	}
 	gorulen := make(map[string]struct{}, 256)
-	cikti := make([]string, 0, 256)
-	Gez(s, func(b string) bool {
+	cikti = make([]string, 0, 256)
+	gez(s, true, func(b string) bool {
 		if _, v := gorulen[b]; v {
 			return true
 		}
+		if len(cikti) >= maks {
+			kesildi = true
+			return false
+		}
 		gorulen[b] = struct{}{}
 		cikti = append(cikti, b)
-		return len(cikti) < maks
+		return true
 	})
-	return cikti
+	return cikti, kesildi
 }
 
 // Gez metni tek geçişte belirteçlere ayırır ve her kabul edilen belirteç için
@@ -93,9 +111,17 @@ func TekilBelirtecler(s string, maks int) []string {
 // şey ayırıcıdır. "ENK-1234" iki belirteç olur: "enk" ve "1234"; aynı ayırma
 // sorgu anında da olduğu için arama yine eşleşir.
 func Gez(s string, geri func(belirtec string) bool) {
+	gez(s, false, geri)
+}
+
+// gez, parcala doğruysa küçük→büyük harf ve harf↔rakam geçişlerinde bölünen
+// parçaları da (bütün belirteçten sonra) bildirir.
+func gez(s string, parcala bool, geri func(belirtec string) bool) {
 	var sb strings.Builder
 	sb.Grow(EnUzunBelirtec + 1)
 	tastiMi := false // belirteç EnUzunBelirtec'i aştı mı?
+	var sinirlar []int
+	var onceki rune
 
 	bitir := func() bool {
 		if sb.Len() == 0 && !tastiMi {
@@ -105,13 +131,28 @@ func Gez(s string, geri func(belirtec string) bool) {
 		sb.Reset()
 		asti := tastiMi
 		tastiMi = false
+		parcaSinir := sinirlar
+		sinirlar = sinirlar[:0]
 		// Taşan belirteci kırpmıyoruz — kırpmak yanlış eşleşme üretir
 		// ("a1b2c3..." gibi bir hash'in ilk 32 karakteri sahte bir terim
 		// olur). Tamamen atıyoruz.
-		if asti || !Kabul(b) {
+		if asti {
 			return true
 		}
-		return geri(b)
+		if Kabul(b) && !geri(b) {
+			return false
+		}
+		bas := 0
+		for i, son := range append(parcaSinir, len(b)) {
+			if i == len(parcaSinir) && bas == 0 {
+				break // hiç sınır yok: parça = bütün
+			}
+			if p := b[bas:son]; Kabul(p) && !geri(p) {
+				return false
+			}
+			bas = son
+		}
+		return true
 	}
 
 	for _, r := range s {
@@ -123,7 +164,11 @@ func Gez(s string, geri func(belirtec string) bool) {
 				tastiMi = true
 				continue
 			}
+			if parcala && sb.Len() > 0 && parcaSiniriMi(onceki, r) {
+				sinirlar = append(sinirlar, sb.Len())
+			}
 			sb.WriteRune(k)
+			onceki = r
 			continue
 		}
 		if !bitir() {
@@ -131,6 +176,36 @@ func Gez(s string, geri func(belirtec string) bool) {
 		}
 	}
 	bitir()
+}
+
+// parcaSiniriMi iki ardışık özgün rune arasında bir kelime sınırı olup
+// olmadığını söyler: "userService" (küçük→büyük), "rapor2024" (harf↔rakam).
+func parcaSiniriMi(onceki, simdiki rune) bool {
+	if unicode.IsLower(onceki) && unicode.IsUpper(simdiki) {
+		return true
+	}
+	return unicode.IsDigit(onceki) != unicode.IsDigit(simdiki)
+}
+
+// IfadeBicimi tam ifade karşılaştırması için metni katlar ve harf/rakam
+// dışındaki her diziyi tek boşluğa indirir: "Proje-Planı  v2" → "proje plani v2".
+func IfadeBicimi(s string) string {
+	var sb strings.Builder
+	sb.Grow(len(s))
+	bosluk := true
+	for _, r := range s {
+		k := Katla(r)
+		if harfMi(k) || rakamMi(k) {
+			sb.WriteRune(k)
+			bosluk = false
+			continue
+		}
+		if !bosluk {
+			sb.WriteByte(' ')
+			bosluk = true
+		}
+	}
+	return strings.TrimRight(sb.String(), " ")
 }
 
 // Kabul bir belirtecin indekslenip indekslenmeyeceğine karar verir.

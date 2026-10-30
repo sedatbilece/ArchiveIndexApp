@@ -31,6 +31,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"arsiv-indeks/internal/atomik"
@@ -39,7 +40,7 @@ import (
 
 // SurumNo indeks şema sürümü. Uyuşmazlıkta indeks migrate edilmez, atılır ve
 // yeniden tarama istenir — arşiv indeksini yeniden üretmek her zaman mümkün.
-const SurumNo = 1
+const SurumNo = 2 // 2: CamelCase/harf-rakam parçaları ve 10.000 terim sınırı
 
 // DosyaAdi indeks dosyasının adı.
 const DosyaAdi = "indeks.gob"
@@ -111,6 +112,13 @@ type Indeks struct {
 	// Türetilmiş alanlar: diske yazılmaz, yüklemeden sonra Hazirla üretir.
 	adNorm  []string
 	yolNorm []string
+
+	// terimler iki haritanın sıralı, tekil anahtarlarıdır (önek araması ve
+	// yazım önerisi için). Her yazmadan sonra kirli işaretlenir ve ilk
+	// okumada tembel üretilir: tarama sırasında her partide sıralamayalım.
+	terimKilit sync.Mutex
+	terimKirli atomic.Bool
+	terimler   []string
 }
 
 // Yeni boş bir indeks oluşturur.
@@ -185,6 +193,27 @@ func (o Okuyucu) Df(terim string) int { return len(o.ix.Gonderiler[terim]) }
 // yeterince iyi.
 func (o Okuyucu) ToplamDf(terim string) int {
 	return len(o.ix.Gonderiler[terim]) + len(o.ix.AdGonderiler[terim])
+}
+
+// OnekliTerimler sözlükte onek ile başlayan terimleri (onek'in kendisi
+// dahil) alfabetik sırada, en fazla enFazla tane döner.
+func (o Okuyucu) OnekliTerimler(onek string, enFazla int) []string {
+	t := o.ix.siraliTerimler()
+	i := sort.SearchStrings(t, onek)
+	var cikti []string
+	for ; i < len(t) && len(cikti) < enFazla && strings.HasPrefix(t[i], onek); i++ {
+		cikti = append(cikti, t[i])
+	}
+	return cikti
+}
+
+// TerimleriGez sözlükteki her terim için fn'i çağırır; fn false dönerse durur.
+func (o Okuyucu) TerimleriGez(fn func(terim string) bool) {
+	for _, t := range o.ix.siraliTerimler() {
+		if !fn(t) {
+			return
+		}
+	}
 }
 
 // Uzantilar canlı dokümanların uzantılarını sayılarıyla, çoktan aza sıralı
@@ -290,6 +319,7 @@ func (ix *Indeks) EkleToplu(girdiler []Girdi) {
 	}
 	ix.kilit.Lock()
 	defer ix.kilit.Unlock()
+	ix.terimKirli.Store(true)
 
 	for _, g := range girdiler {
 		ak := Anahtar(g.Yol)
@@ -450,6 +480,7 @@ func (ix *Indeks) Temizle() {
 	ix.Silinmis = nil
 	ix.SilinmisN = 0
 	ix.SonTarama = 0
+	ix.terimKirli.Store(true)
 }
 
 // TombstoneOrani ölü doküman oranını döner. %20'yi geçince Sikistir çağrılır.
@@ -518,6 +549,7 @@ func (ix *Indeks) Sikistir() {
 	}
 	ix.Silinmis = nil
 	ix.SilinmisN = 0
+	ix.terimKirli.Store(true)
 }
 
 // ---------------------------------------------------------------- tombstone
@@ -558,6 +590,29 @@ func (ix *Indeks) Hazirla() {
 	ix.hazirla()
 }
 
+// siraliTerimler sıralı terim listesini gerekirse yeniden üretip döner.
+// Okuma kilidi altında çağrılır: haritalar bu sırada değişemez, terimKilit
+// yalnızca aynı anda gelen iki okuyucunun listeyi birlikte kurmasını önler.
+func (ix *Indeks) siraliTerimler() []string {
+	ix.terimKilit.Lock()
+	defer ix.terimKilit.Unlock()
+	if ix.terimKirli.Load() || ix.terimler == nil {
+		t := make([]string, 0, len(ix.Gonderiler)+len(ix.AdGonderiler)/4)
+		for k := range ix.Gonderiler {
+			t = append(t, k)
+		}
+		for k := range ix.AdGonderiler {
+			if _, v := ix.Gonderiler[k]; !v {
+				t = append(t, k)
+			}
+		}
+		sort.Strings(t)
+		ix.terimler = t
+		ix.terimKirli.Store(false)
+	}
+	return ix.terimler
+}
+
 func (ix *Indeks) hazirla() {
 	if ix.YolID == nil {
 		ix.YolID = make(map[string]uint32)
@@ -568,6 +623,7 @@ func (ix *Indeks) hazirla() {
 	if ix.AdGonderiler == nil {
 		ix.AdGonderiler = make(map[string][]uint32)
 	}
+	ix.terimKirli.Store(true)
 	ix.adNorm = make([]string, len(ix.Belgeler))
 	ix.yolNorm = make([]string, len(ix.Belgeler))
 	for i, b := range ix.Belgeler {

@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 
 	"arsiv-indeks/internal/atomik"
@@ -38,7 +39,14 @@ type Ayarlar struct {
 	DokumanBelirtecCap int `json:"dokumanBelirtecCap"`
 
 	SonTarama string `json:"sonTarama"`
+
+	// AyarSurumu eski ayar dosyalarına yeni varsayılanları bir kez
+	// uygulamak için tutulur (bkz. gecisYap).
+	AyarSurumu int `json:"ayarSurumu"`
 }
+
+// GuncelAyarSurumu ayar dosyası biçiminin güncel sürümüdür.
+const GuncelAyarSurumu = 2
 
 // Varsayilan makul başlangıç ayarlarını döner.
 func Varsayilan() Ayarlar {
@@ -47,6 +55,7 @@ func Varsayilan() Ayarlar {
 		HaricKlasorler: []string{
 			"$RECYCLE.BIN", "System Volume Information", "$WinREAgent",
 			".git", ".svn", "node_modules", "__pycache__", ".venv",
+			"bin", "obj", "dist", "build", ".vs", "packages",
 		},
 		HaricUzantilar: []string{
 			".exe", ".dll", ".sys", ".msi", ".iso", ".img", ".vhd", ".vhdx",
@@ -54,6 +63,7 @@ func Varsayilan() Ayarlar {
 			".mp4", ".mkv", ".avi", ".mov", ".mp3", ".wav", ".flac",
 			".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tif", ".tiff", ".webp",
 			".pdb", ".obj", ".lib", ".so", ".dylib",
+			".map", ".wasm", ".pak", ".brotli", ".jar", ".lnk",
 		},
 		IcerikCikarma: true,
 		IcerikUzantilari: []string{
@@ -72,7 +82,8 @@ func Varsayilan() Ayarlar {
 		MaksMetinKarakter:  1_000_000,
 		IsciSayisi:         0,
 		SayfaBasiSonuc:     25,
-		DokumanBelirtecCap: 2000,
+		DokumanBelirtecCap: 10_000,
+		AyarSurumu:         GuncelAyarSurumu,
 	}
 }
 
@@ -100,12 +111,43 @@ func Yukle(veriDizini string) (Ayarlar, error) {
 		return a, fmt.Errorf("ayarlar okunamadı: %w", err)
 	}
 	// Varsayılanların üzerine yazıyoruz, böylece sonradan eklenen bir alan
-	// eski bir ayar dosyasında sıfır değer almaz.
+	// eski bir ayar dosyasında sıfır değer almaz. AyarSurumu hariç: dosyada
+	// yoksa 0 kalmalı ki geçiş çalışsın.
+	a.AyarSurumu = 0
 	if err := json.Unmarshal(b, &a); err != nil {
 		return Varsayilan(), fmt.Errorf("ayarlar dosyası bozuk: %w", err)
 	}
+	a.gecisYap()
 	a.Duzelt()
 	return a, nil
+}
+
+// gecisYap eski bir ayar dosyasına, kullanıcının değiştirmediği yerlerde
+// yeni varsayılanları uygular. Listelere yalnızca ekleme yapar; kullanıcının
+// kendi çıkardığı bir öğe sürüm başına bir kez geri gelebilir.
+func (a *Ayarlar) gecisYap() {
+	if a.AyarSurumu >= GuncelAyarSurumu {
+		return
+	}
+	if a.AyarSurumu < 2 {
+		if a.DokumanBelirtecCap == 2000 {
+			a.DokumanBelirtecCap = 10_000
+		}
+		a.HaricKlasorler = eksikleriEkle(a.HaricKlasorler,
+			"bin", "obj", "dist", "build", ".vs", "packages")
+		a.HaricUzantilar = eksikleriEkle(a.HaricUzantilar,
+			".map", ".wasm", ".pak", ".brotli", ".jar", ".lnk")
+	}
+	a.AyarSurumu = GuncelAyarSurumu
+}
+
+func eksikleriEkle(liste []string, yeniler ...string) []string {
+	for _, y := range yeniler {
+		if !slices.ContainsFunc(liste, func(s string) bool { return strings.EqualFold(s, y) }) {
+			liste = append(liste, y)
+		}
+	}
+	return liste
 }
 
 // Kaydet ayarları atomik olarak yazar.

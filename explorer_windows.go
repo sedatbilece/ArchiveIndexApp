@@ -3,8 +3,11 @@
 package main
 
 import (
+	"fmt"
 	"os/exec"
+	"path/filepath"
 	"syscall"
+	"unsafe"
 )
 
 // klasordeGoster dosyayı Windows Gezgini'nde seçili olarak açar.
@@ -28,5 +31,35 @@ func klasordeGoster(yol string) error {
 		return err
 	}
 	go cmd.Wait() // zombi süreç bırakmayalım
+	return nil
+}
+
+var shellExecute = syscall.NewLazyDLL("shell32.dll").NewProc("ShellExecuteW")
+
+// sistemdeAc dosyayı Windows'ta varsayılan uygulamasıyla açar.
+//
+// ShellExecuteW'yi doğrudan çağırıyoruz: komut satırı kurulmadığı için
+// dosya adındaki & ^ " gibi karakterlerle argüman enjeksiyonu mümkün değil.
+func sistemdeAc(yol string) error {
+	islem, err := syscall.UTF16PtrFromString("open")
+	if err != nil {
+		return err
+	}
+	dosya, err := syscall.UTF16PtrFromString(yol)
+	if err != nil {
+		return err
+	}
+	dizin, err := syscall.UTF16PtrFromString(filepath.Dir(yol))
+	if err != nil {
+		return err
+	}
+	const swGoster = 1 // SW_SHOWNORMAL
+	r, _, _ := shellExecute.Call(0,
+		uintptr(unsafe.Pointer(islem)), uintptr(unsafe.Pointer(dosya)), 0,
+		uintptr(unsafe.Pointer(dizin)), swGoster)
+	// ShellExecute 32'den büyük bir değer döndürürse başarılıdır.
+	if r <= 32 {
+		return fmt.Errorf("ShellExecute hata kodu %d", r)
+	}
 	return nil
 }

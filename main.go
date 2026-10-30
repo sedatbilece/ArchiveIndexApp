@@ -63,8 +63,11 @@ type Uygulama struct {
 	gelistirme bool
 	jeton      string
 
-	// indeksHata açılışta indeks yüklenemediyse kullanıcıya gösterilir.
+	// indeksHata açılışta indeks yüklenemediyse kullanıcıya gösterilir;
+	// yeni indeksle bir tarama tamamlanınca gizlenir (bkz. acilisHatasi).
 	indeksHata string
+	// ayarHata açılışta ayar dosyası okunamadıysa gösterilir.
+	ayarHata string
 
 	ayarKilit sync.RWMutex
 	ayar      ayarlar.Ayarlar
@@ -111,8 +114,8 @@ func main() {
 		log.Printf("İndeks:                  %d dosya, %d terim",
 			o.CanliSayisi(), o.TerimSayisi())
 	})
-	if u.indeksHata != "" {
-		log.Printf("UYARI: %s", u.indeksHata)
+	if h := u.acilisHatasi(); h != "" {
+		log.Printf("UYARI: %s", h)
 	}
 
 	sunucu := &http.Server{
@@ -171,8 +174,9 @@ func yeniUygulama(veriDizini string, gelistirme bool) (*Uygulama, error) {
 	}
 	if ixHata != nil {
 		u.indeksHata = ixHata.Error()
-	} else if ayarHata != nil {
-		u.indeksHata = ayarHata.Error()
+	}
+	if ayarHata != nil {
+		u.ayarHata = ayarHata.Error()
 	}
 
 	if err := u.sablonlariYukle(); err != nil {
@@ -249,6 +253,12 @@ func (u *Uygulama) statikHazirla() {
 
 // goster sayfayı render eder.
 func (u *Uygulama) goster(w http.ResponseWriter, sayfa string, sv SayfaVerisi) {
+	u.gosterBlok(w, sayfa, "layout", sv)
+}
+
+// gosterBlok sayfa şablonundaki tek bir bloğu render eder; blok "layout"
+// ise tüm sayfa basılır.
+func (u *Uygulama) gosterBlok(w http.ResponseWriter, sayfa, blok string, sv SayfaVerisi) {
 	// Geliştirme modunda her istekte yeniden yükle: düzenle-yenile döngüsü.
 	if u.gelistirme {
 		if err := u.sablonlariYukle(); err != nil {
@@ -265,7 +275,7 @@ func (u *Uygulama) goster(w http.ResponseWriter, sayfa string, sv SayfaVerisi) {
 	sv.Jeton = u.jeton
 	sv.Versiyon = u.surum()
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := t.ExecuteTemplate(w, "layout", sv); err != nil {
+	if err := t.ExecuteTemplate(w, blok, sv); err != nil {
 		// Gövdenin bir kısmı yazılmış olabilir; en azından kaydet.
 		log.Printf("şablon hatası (%s): %v", sayfa, err)
 	}
@@ -414,6 +424,7 @@ func (u *Uygulama) rotalar() http.Handler {
 
 	mux.HandleFunc("GET /dosya/indir", u.dosyaIndirHandler)
 	mux.HandleFunc("POST /dosya/klasorde-goster", u.klasordeGosterHandler)
+	mux.HandleFunc("POST /dosya/ac", u.dosyaAcHandler)
 
 	mux.Handle("GET /static/", u.statik)
 
@@ -427,6 +438,23 @@ func (u *Uygulama) anaSayfaHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // ---------------------------------------------------------------- yardımcı
+
+// acilisHatasi sayfalarda gösterilecek açılış hatasını döner. İndeks hatası
+// yalnızca yeni indeksle henüz bir tarama tamamlanmadıysa geçerlidir.
+func (u *Uygulama) acilisHatasi() string {
+	if u.ayarHata != "" {
+		return u.ayarHata
+	}
+	if u.indeksHata == "" {
+		return ""
+	}
+	taranmis := false
+	u.ix.Oku(func(o indeks.Okuyucu) { taranmis = !o.SonTarama().IsZero() })
+	if taranmis {
+		return ""
+	}
+	return u.indeksHata
+}
 
 // Ayar mevcut ayarların bir kopyasını döner.
 func (u *Uygulama) Ayar() ayarlar.Ayarlar {

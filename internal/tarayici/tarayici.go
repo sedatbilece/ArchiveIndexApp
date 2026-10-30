@@ -329,7 +329,13 @@ func isci(
 
 			s.Durum = durum
 			if icerik != "" {
-				s.Belirtecler = metin.TekilBelirtecler(icerik, ay.DokumanBelirtecCap)
+				var kesildi bool
+				s.Belirtecler, kesildi = metin.TekilBelirteclerSinirli(icerik, ay.DokumanBelirtecCap)
+				// Terim sınırına takılan dosya "tam" görünmesin; kullanıcı
+				// sonuçta "içerik kısmen indeksli" etiketini görsün.
+				if kesildi && s.Durum == cikarim.DurumTam {
+					s.Durum = cikarim.DurumKirpildi
+				}
 			}
 		}
 

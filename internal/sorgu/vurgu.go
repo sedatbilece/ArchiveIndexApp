@@ -1,7 +1,9 @@
 package sorgu
 
 import (
+	"slices"
 	"strings"
+	"unicode/utf8"
 
 	"arsiv-indeks/internal/metin"
 )
@@ -100,10 +102,15 @@ func isaretleriParcala(runeler []rune, isaret []bool) []Parca {
 	return parcalar
 }
 
-// Parcacik metin içinde aranan parçaların ilk geçtiği yerin çevresinden bir
-// alıntı çıkarır ve vurgular.
+// EnFazlaPencere parçacıkta gösterilecek en fazla alıntı sayısıdır.
+const EnFazlaPencere = 3
+
+// Parcacik metin içinden, aranan parçaların geçtiği yerlerin çevresinden en
+// fazla EnFazlaPencere alıntı çıkarır ve vurgular. Önce her parçanın ilk
+// geçtiği yer seçilir, böylece farklı kelimeler ayrı ayrı görünür.
 //
-// pencere, eşleşmenin her iki yanından alınacak yaklaşık karakter sayısıdır.
+// pencere, tek alıntıda eşleşmenin her iki yanından alınacak yaklaşık
+// karakter sayısıdır; birden çok alıntıda yarısı kullanılır.
 func Parcacik(icerik string, aranan []string, pencere int) []Parca {
 	if icerik == "" {
 		return nil
@@ -119,36 +126,89 @@ func Parcacik(icerik string, aranan []string, pencere int) []Parca {
 	}
 	normal := string(normalRuneler)
 
-	// İlk eşleşmenin rune konumunu bul.
-	enIyi := -1
-	for _, a := range aranan {
-		hedef := metin.Normalize(strings.TrimSpace(a))
-		if hedef == "" {
-			continue
-		}
-		if i := strings.Index(normal, hedef); i >= 0 {
-			r := len([]rune(normal[:i]))
-			if enIyi < 0 || r < enIyi {
-				enIyi = r
-			}
-		}
-	}
-	if enIyi < 0 {
+	ilkler, hepsi := eslesmeKonumlari(normal, aranan)
+	if len(ilkler) == 0 {
 		// Eşleşme içerikte değil (ad veya yolda eşleşmiş olabilir):
 		// baştan bir alıntı gösteriyoruz.
 		return Vurgula(satirlariTemizle(string(asilRuneler[:min(len(asilRuneler), pencere*2)])), aranan)
 	}
 
-	bas := max(0, enIyi-pencere)
-	son := min(len(asilRuneler), enIyi+pencere)
-	alinti := satirlariTemizle(string(asilRuneler[bas:son]))
-	if bas > 0 {
-		alinti = "… " + alinti
+	yarim := pencere / 2
+	var secilen []int
+	ekle := func(r int) {
+		if len(secilen) >= EnFazlaPencere {
+			return
+		}
+		for _, s := range secilen {
+			if abs(s-r) < 2*yarim {
+				return
+			}
+		}
+		secilen = append(secilen, r)
 	}
-	if son < len(asilRuneler) {
-		alinti = alinti + " …"
+	for _, r := range ilkler {
+		ekle(r)
 	}
-	return Vurgula(alinti, aranan)
+	for _, r := range hepsi {
+		ekle(r)
+	}
+	slices.Sort(secilen)
+	if len(secilen) == 1 {
+		yarim = pencere
+	}
+
+	var cikti []Parca
+	for i, r := range secilen {
+		bas := max(0, r-yarim)
+		son := min(len(asilRuneler), r+yarim)
+		alinti := satirlariTemizle(string(asilRuneler[bas:son]))
+		if bas > 0 || i > 0 {
+			alinti = "… " + alinti
+		}
+		if i == len(secilen)-1 && son < len(asilRuneler) {
+			alinti = alinti + " …"
+		} else if i < len(secilen)-1 {
+			alinti = alinti + " "
+		}
+		cikti = append(cikti, Vurgula(alinti, aranan)...)
+	}
+	return cikti
+}
+
+// eslesmeKonumlari aranan parçaların normal metindeki rune konumlarını döner:
+// her parçanın ilk konumu (sıralı) ve parça başına en fazla 20 konumun tümü.
+func eslesmeKonumlari(normal string, aranan []string) (ilkler, hepsi []int) {
+	for _, a := range aranan {
+		hedef := metin.Normalize(strings.TrimSpace(a))
+		if hedef == "" {
+			continue
+		}
+		bayt, rune_ := 0, 0
+		for n := 0; n < 20; n++ {
+			i := strings.Index(normal[bayt:], hedef)
+			if i < 0 {
+				break
+			}
+			rune_ += utf8.RuneCountInString(normal[bayt : bayt+i])
+			bayt += i
+			if n == 0 {
+				ilkler = append(ilkler, rune_)
+			}
+			hepsi = append(hepsi, rune_)
+			bayt += len(hedef)
+			rune_ += utf8.RuneCountInString(hedef)
+		}
+	}
+	slices.Sort(ilkler)
+	slices.Sort(hepsi)
+	return ilkler, hepsi
+}
+
+func abs(x int) int {
+	if x < 0 {
+		return -x
+	}
+	return x
 }
 
 // satirlariTemizle çok satırlı içeriği tek satıra indirir; sonuç satırı

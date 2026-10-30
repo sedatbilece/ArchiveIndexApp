@@ -101,6 +101,13 @@
   </details>
 </form>
 
+<div id="sonuc-alani">{{template "sonuc-alani" $}}</div>
+{{end}}
+<script src="/static/js/arama.js?v={{.Versiyon}}"></script>
+{{end}}
+
+{{define "sonuc-alani"}}
+{{with .Veri}}
 {{if .AramaYapildi}}
   {{if .Cipler}}
   <div class="filtre-cipleri" aria-label="Etkin filtreler">
@@ -123,10 +130,26 @@
       {{if gt .Cikti.SayfaSayisi 1}}
         — sayfa {{.Cikti.Sayfa}} / {{.Cikti.SayfaSayisi}}
       {{end}}
+      <span class="kisayol-ipucu">↑↓ seç · Enter aç · Ctrl+Enter klasörde göster · Ctrl+C yolu kopyala</span>
     {{else}}
       Sonuç bulunamadı.
     {{end}}
   </div>
+  {{if .Cikti.Uyari}}<div class="uyari bilgi">{{.Cikti.Uyari}}</div>{{end}}
+  {{if not .Cikti.Toplam}}
+  <div class="bos-sonuc">
+    {{if .Cikti.Oneri}}
+      <p>Bunu mu demek istediniz:
+        <a class="oneri" href="/arama{{sorguDegis .Sorgu "q" .Cikti.Oneri}}">{{.Cikti.Oneri}}</a></p>
+    {{end}}
+    <ul>
+      {{if .Cipler}}<li><a href="/arama{{.CiplerSiz}}">Filtreler olmadan ara</a></li>{{end}}
+      {{if ne .Istek.Kapsam "hepsi"}}<li><a href="/arama{{sorguDegis .Sorgu "kapsam" ""}}">Ad ve içerikte ara</a></li>{{end}}
+      <li>Kelimenin başını yazmanız yeterli (<code>rapor</code> → raporu, raporlar); daha kısası için <code>ra*</code>.</li>
+    </ul>
+    {{template "sozdizimi"}}
+  </div>
+  {{end}}
 
   {{if .Cikti.Sonuclar}}
   <ul class="sonuclar" data-sorgu="{{.Istek.Metin}}">
@@ -139,6 +162,8 @@
                içeriğine veya adına asla template.HTML uygulanmaz. */}}
           {{range .AdParcalari}}{{if .Vurgulu}}<mark>{{.Metin}}</mark>{{else}}{{.Metin}}{{end}}{{end}}
         </span>
+        {{range .Alanlar}}{{template "rozet" .}}{{end}}
+        {{if .Benzerlik}}<span class="benzerlik" title="Alaka puanı {{printf "%.2f" .Puan}} — en iyi sonuca göre %{{.Benzerlik}}">%{{.Benzerlik}}</span>{{end}}
         {{if .DurumAciklama}}
           <span class="etiket etiket-{{.Durum}}">{{.DurumAciklama}}</span>
         {{end}}
@@ -154,8 +179,13 @@
           <button type="button" class="baglanti-buton kopyala-buton" hidden
                   data-yol="{{.Yol}}" data-ad="{{.Ad}}"
                   title="Tam yolu kopyala (Shift+tık: yalnızca dosya adı)">Yolu kopyala</button>
+          <form method="POST" action="/dosya/ac" class="satir-form ac-form">
+            <input type="hidden" name="jeton" value="{{$.Jeton}}">
+            <input type="hidden" name="yol" value="{{.Yol}}">
+            <button type="submit" class="baglanti-buton" title="Varsayılan uygulamayla aç (Enter)">Aç</button>
+          </form>
           <a href="/dosya/indir?yol={{.Yol}}">İndir</a>
-          <form method="POST" action="/dosya/klasorde-goster" class="satir-form">
+          <form method="POST" action="/dosya/klasorde-goster" class="satir-form klasor-form">
             <input type="hidden" name="jeton" value="{{$.Jeton}}">
             <input type="hidden" name="yol" value="{{.Yol}}">
             <button type="submit" class="baglanti-buton">Klasörde göster</button>
@@ -193,10 +223,33 @@
   <div class="bos-durum">
     <p><strong>{{sayi .CanliSayisi}}</strong> dosya indeksli.</p>
     <p>Dosya adına, içeriğindeki bir kelimeye, uzantısına, tarihine veya
-       bulunduğu klasöre göre arayabilirsiniz.</p>
+       bulunduğu klasöre göre arayabilirsiniz. Sonuçlar yazdıkça gelir.</p>
+    {{template "sozdizimi"}}
   </div>
 {{end}}
 
 {{end}}
-<script src="/static/js/arama.js?v={{.Versiyon}}"></script>
+{{end}}
+
+{{define "sozdizimi"}}
+<dl class="sozdizimi">
+  <dt><code>rapor*</code></dt><dd>ile başlayan (3+ harfte kendiliğinden)</dd>
+  <dt><code>"proje planı"</code></dt><dd>tam ifade</dd>
+  <dt><code>-taslak</code></dt><dd>hariç tut</dd>
+  <dt><code>fatura VEYA irsaliye</code></dt><dd>ikisinden biri</dd>
+  <dt><code>ad:teklif</code></dt><dd>yalnızca dosya adında</dd>
+  <dt><code>klasor:2024</code></dt><dd>klasör yolunda geçen</dd>
+  <dt><code>uzanti:pdf</code></dt><dd>uzantı</dd>
+</dl>
+{{end}}
+
+{{/* Eşleşme rozeti: alan başına renk ve simge; metin ekran okuyucu için de yeterli. */}}
+{{define "rozet"}}
+{{- if eq . "ad" -}}
+<span class="rozet rozet-ad" title="Dosya adında eşleşti"><svg class="rozet-simge" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>ad</span>
+{{- else if eq . "klasör" -}}
+<span class="rozet rozet-klasor" title="Klasör yolunda eşleşti"><svg class="rozet-simge" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>klasör</span>
+{{- else -}}
+<span class="rozet rozet-icerik" title="Dosya içeriğinde eşleşti"><svg class="rozet-simge" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg>içerik</span>
+{{- end -}}
 {{end}}

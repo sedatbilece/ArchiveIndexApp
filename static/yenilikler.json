@@ -1,5 +1,37 @@
 [
   {
+    "surum": "v0.0.11",
+    "tarih": "30.10.2026",
+    "maddeler": [
+      "Eşleşme rozetleri renkli ve simgeli: ad (mavi), klasör (amber), içerik (yeşil).",
+      "Alaka sıralamasında her sonucun sağ üstünde, en iyi sonuca göre yüzde olarak benzerlik gösteriliyor; üzerine gelince ham puan görünüyor."
+    ]
+  },
+  {
+    "surum": "v0.0.10",
+    "tarih": "30.10.2026",
+    "maddeler": [
+      "Tarama tamamlandıktan sonra \"yeniden tarama gerekli\" uyarısı artık kayboluyor."
+    ]
+  },
+  {
+    "surum": "v0.0.9",
+    "tarih": "30.10.2026",
+    "maddeler": [
+      "Kelimenin başını yazmak yeterli: \"rapor\" araması raporu, raporlar, raporlama geçen dosyaları da buluyor; kısa kelimeler için \"ra*\".",
+      "Sorgu dili: \"tam ifade\", -hariç, a VEYA b, ad:teklif, klasor:2024, uzanti:pdf.",
+      "Sonuçlar yazdıkça geliyor; Enter'a basmak gerekmiyor.",
+      "Klavye: ↑↓ ile sonuç seç, Enter ile aç, Ctrl+Enter ile klasörde göster, Ctrl+C ile yolu kopyala.",
+      "Sonuç satırına \"Aç\" eklendi: dosya varsayılan uygulamasıyla açılıyor (betik türleri güvenlik için klasörde gösteriliyor).",
+      "Rozetler eşleşmenin adda mı, klasörde mi, içerikte mi olduğunu gösteriyor; parçacık en fazla üç eşleşmeyi gösteriyor.",
+      "Sonuç çıkmazsa yazım önerisi (\"dockr\" → \"docker\") ve filtreleri/kapsamı genişleten bağlantılar.",
+      "UserService gibi bitişik yazılmış adlar \"user service\" ile de bulunuyor.",
+      "bin, obj, dist, build klasörleri ve .map, .wasm, .jar, .lnk gibi dosyalar varsayılan olarak taranmıyor; üçüncü taraf belge klasörleri sıralamada geri itiliyor.",
+      "Dosya başına terim sınırı 10.000'e çıktı; sınıra takılan dosyalar \"içerik kısmen indeksli\" olarak işaretleniyor.",
+      "İndeks biçimi değişti: güncellemeden sonra bir kez \"Taramayı başlat\" gerekiyor."
+    ]
+  },
+  {
     "surum": "v0.0.8",
     "tarih": "01.10.2026",
     "maddeler": [

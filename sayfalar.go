@@ -103,7 +103,12 @@ func filtresizAdres(q url.Values) template.URL {
 // yer imlenebilir ve geri tuşu doğru çalışır.
 func (u *Uygulama) aramaHandler(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
+	// parca=sonuclar: canlı arama yalnızca sonuç bölümünü ister. Parametreyi
+	// atıyoruz ki sayfalama ve çip bağlantılarına sızmasın.
+	parcali := q.Get("parca") == "sonuclar"
+	q.Del("parca")
 	istek := sorgu.Ayristir(q, u.istekAdedi())
+	istek.IcerikOku = u.dosyaMetni
 	ay := u.Ayar()
 
 	veri := AramaVerisi{
@@ -129,8 +134,10 @@ func (u *Uygulama) aramaHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	sv := SayfaVerisi{Baslik: "Arama", Veri: veri}
-	if u.indeksHata != "" {
-		sv.Hata = u.indeksHata
+	sv.Hata = u.acilisHatasi()
+	if parcali {
+		u.gosterBlok(w, "arama", "sonuc-alani", sv)
+		return
 	}
 	u.goster(w, "arama", sv)
 }
@@ -182,9 +189,7 @@ func (u *Uygulama) ayarlarVerisi(ay ayarlar.Ayarlar) AyarlarVerisi {
 // bedavadır: anlık görüntüyü şablona basıyoruz, JS oradan devam ediyor.
 func (u *Uygulama) ayarlarHandler(w http.ResponseWriter, r *http.Request) {
 	sv := SayfaVerisi{Baslik: "Ayarlar", Veri: u.ayarlarVerisi(u.Ayar())}
-	if u.indeksHata != "" {
-		sv.Hata = u.indeksHata
-	}
+	sv.Hata = u.acilisHatasi()
 	if r.URL.Query().Get("kaydedildi") == "1" {
 		sv.Basari = "Ayarlar kaydedildi."
 		// Kullanıcı indeksinin değiştiğini bilmeli.
